@@ -20,7 +20,7 @@ const UserDashboard = () => {
         const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
         // Get user's attendance records for this month
-        const userAttendance = await getUserAttendance(state.user.id, startOfMonth, endOfMonth);
+        const userAttendance = await getUserAttendance(state.user!.id, startOfMonth, endOfMonth);
 
         // Calculate stats
         const total = userAttendance.length;
