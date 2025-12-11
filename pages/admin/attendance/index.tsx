@@ -48,17 +48,26 @@ const TakeStudentAttendance = () => {
     }
 
     try {
-      // Create attendance record
-      const attendance = await prisma.attendance.create({
-        data: {
+      // Make API call to record attendance
+      const response = await fetch('/api/attendance', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${state.token}`
+        },
+        body: JSON.stringify({
           userId: scannedUser.id,
           attendanceType: 'MURID', // For student attendance
-          date: new Date(),
           status: attendanceStatus,
           recordedBy: state.user.id, // The logged-in user (teacher) is recording
           note: note || null,
-        }
+        })
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Error recording attendance');
+      }
 
       // Log the attendance activity
       await logActivity(

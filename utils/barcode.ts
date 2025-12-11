@@ -1,7 +1,5 @@
 // Barcode utility functions
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import db from '@/lib/db';
 
 // Generate user barcode data containing user ID, name and role
 export const generateBarcodeData = (userId: string, name: string, role: string): string => {
@@ -34,59 +32,58 @@ export const parseBarcodeData = (barcodeData: string): { userId: string; name: s
 // Validate user from barcode data
 export const validateUserFromBarcode = async (barcodeData: string) => {
   const parsedData = parseBarcodeData(barcodeData);
-  
+
   if (!parsedData) {
     throw new Error('Invalid barcode data');
   }
 
   // Find user in database
-  const user = await prisma.user.findUnique({
-    where: { 
-      barcodeData // The full JSON string is stored as barcodeData in the database
-    },
-    select: {
-      id: true,
-      userId: true,
-      name: true,
-      email: true,
-      role: true,
-      isActive: true
+  const client = await db.connect();
+
+  try {
+    const result = await client.query(
+      'SELECT id, userId, name, email, role, isActive FROM users WHERE barcodeData = $1',
+      [barcodeData]
+    );
+
+    const user = result.rows[0];
+
+    if (!user) {
+      throw new Error('User not found for this barcode');
     }
-  });
 
-  if (!user) {
-    throw new Error('User not found for this barcode');
+    if (!user.isActive) {
+      throw new Error('User account is deactivated');
+    }
+
+    return user;
+  } finally {
+    client.release();
   }
-
-  if (!user.isActive) {
-    throw new Error('User account is deactivated');
-  }
-
-  return user;
 };
 
 // Validate user by ID (alternative to barcode)
 export const validateUserById = async (userId: string) => {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      userId: true,
-      name: true,
-      email: true,
-      role: true,
-      isActive: true,
-      barcodeData: true
+  const client = await db.connect();
+
+  try {
+    const result = await client.query(
+      'SELECT id, userId, name, email, role, isActive, barcodeData FROM users WHERE id = $1',
+      [userId]
+    );
+
+    const user = result.rows[0];
+
+    if (!user) {
+      throw new Error('User not found');
     }
-  });
 
-  if (!user) {
-    throw new Error('User not found');
+    if (!user.isActive) {
+      throw new Error('User account is deactivated');
+    }
+
+    return user;
+  } finally {
+    client.release();
   }
-
-  if (!user.isActive) {
-    throw new Error('User account is deactivated');
-  }
-
-  return user;
 };

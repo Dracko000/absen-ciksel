@@ -1,7 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { authenticateUser, getUserFromToken } from '@/lib/auth';
 import { logActivity } from '@/lib/activity';
-import prisma from '@/lib/server/prisma';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -27,18 +26,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     );
 
     // Return user data and token
-    const { password: _, ...userWithoutPassword } = authResult.user;
-
+    // The password is already removed in authenticateUser
     res.status(200).json({
       message: 'Login successful',
-      user: userWithoutPassword,
+      user: authResult.user,
       token: authResult.token
     });
   } catch (error: any) {
     res.status(401).json({
       message: error.message || 'Authentication failed'
     });
-  } finally {
-    await prisma.$disconnect();
   }
 }

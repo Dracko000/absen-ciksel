@@ -1,7 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getUserFromToken } from '@/lib/auth';
 import { getUserActivityLogs, getAllActivityLogs, getActivityStats } from '@/lib/activity';
-import prisma from '@/lib/server/prisma';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -21,7 +20,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Parse query parameters
     const { startDate, endDate, limit = 50, offset = 0, userId } = req.query;
-    
+
     // If userId is specified, only superadmin can access other users' logs
     if (userId && user.role !== 'SUPERADMIN') {
       return res.status(403).json({ message: 'Access denied' });
@@ -74,8 +73,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     });
   } catch (error: any) {
-    res.status(401).json({ 
-      message: error.message || 'Token verification failed' 
+    res.status(401).json({
+      message: error.message || 'Token verification failed'
     });
   }
 }
