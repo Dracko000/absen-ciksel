@@ -1,22 +1,13 @@
-// Use dynamic import to avoid build issues with Next.js 16 and Prisma v7
-let prisma: any;
+import { PrismaClient } from '@prisma/client';
 
-if (typeof window === 'undefined') {
-  // Server-side
-  const { PrismaClient } = require('@prisma/client');
-
-  // Declare global for Prisma client in development
-  if (process.env.NODE_ENV !== 'production') {
-    if (!global.prisma) {
-      global.prisma = new PrismaClient();
-    }
-    prisma = global.prisma;
-  } else {
-    prisma = new PrismaClient();
-  }
-} else {
-  // Client-side - should not happen in API routes, but just in case
-  prisma = null;
+// PrismaClient is attached to the `global` object in development to prevent
+// exhausting your database connection limit.
+// Learn more: https://pris.ly/d/client
+declare global {
+  var prisma: PrismaClient | undefined;
 }
 
-export default prisma;
+const client = global.prisma || new PrismaClient();
+if (process.env.NODE_ENV !== 'production') global.prisma = client;
+
+export default client;
