@@ -1,4 +1,4 @@
-import prisma from '@/lib/prisma';
+import prisma from '@/lib/server/prisma';
 
 // Get attendance records for a specific user
 export const getUserAttendance = async (userId: string, startDate?: Date, endDate?: Date) => {

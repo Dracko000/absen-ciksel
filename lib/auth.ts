@@ -1,6 +1,6 @@
 import { sign, verify } from 'jsonwebtoken';
 import { compare, hash } from 'bcryptjs';
-import prisma from '@/lib/prisma';
+import prisma from '@/lib/server/prisma';
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_for_development';
 
 // Define user roles

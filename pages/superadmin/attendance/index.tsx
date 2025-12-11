@@ -4,7 +4,6 @@ import Layout from '@/components/layout/Layout';
 import BarcodeScanner from '@/components/barcode/BarcodeScanner';
 import { validateUserFromBarcode } from '@/utils/barcode';
 import { logActivity } from '@/lib/activity';
-import prisma from '@/lib/prisma';
 import { UserRole } from '@/lib/auth';
 import { useAuth } from '@/context/AuthContext';
 

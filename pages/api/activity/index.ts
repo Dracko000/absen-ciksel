@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getUserFromToken } from '@/lib/auth';
 import { getUserActivityLogs, getAllActivityLogs, getActivityStats } from '@/lib/activity';
+import prisma from '@/lib/server/prisma';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {

@@ -1,4 +1,4 @@
-import prisma from '@/lib/prisma';
+import prisma from '@/lib/server/prisma';
 
 // Log user activity
 export const logActivity = async (
