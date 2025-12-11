@@ -1,0 +1,73 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../node_modules/@prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  SUPERADMIN // Kepala Sekolah
+  ADMIN     // Guru
+  USER      // Murid
+}
+
+enum AttendanceType {
+  GURU  // For teacher attendance
+  MURID // For student attendance
+}
+
+model User {
+  id           String     @id @default(cuid())
+  userId       String     @unique // Unique identifier for the user
+  name         String
+  email        String     @unique
+  password     String
+  role         UserRole
+  barcodeData  String     @unique // Barcode data containing user info
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  // Relationships
+  attendanceRecords Attendance[]
+  activityLogs      ActivityLog[]
+
+  // Optional fields
+  classId      String?    // For students only
+  subject      String?    // For teachers only
+}
+
+model Attendance {
+  id             String     @id @default(cuid())
+  userId         String
+  user           User       @relation(fields: [userId], references: [id])
+  attendanceType AttendanceType
+  date           DateTime   @default(now())
+  status         String     // PRESENT, ABSENT, LATE, etc.
+  location       String?    // Optional location data
+  deviceInfo     String?    // Device information
+  recordedBy     String     // ID of the user who recorded the attendance (can be self or admin)
+  note           String?    // Optional notes
+
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+}
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  action      String   // LOGIN, ATTENDANCE_TAKEN, etc.
+  description String
+  ipAddress   String?
+  userAgent   String?
+  timestamp   DateTime @default(now())
+}
