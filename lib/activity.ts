@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-// Note: PostgreSQL client is imported dynamically in functions that run server-side only
+// Note: PostgreSQL client is now connected via shared pool for better serverless performance
 
 // Log user activity
 export const logActivity = async (
@@ -9,19 +9,7 @@ export const logActivity = async (
   ipAddress?: string,
   userAgent?: string
 ) => {
-  const { Pool } = await import('pg');
-
-  const DATABASE_URL = process.env.DATABASE_URL || process.env.NEXT_PUBLIC_DATABASE_URL;
-  if (!DATABASE_URL) {
-    throw new Error('DATABASE_URL environment variable is not defined');
-  }
-
-  const pool = new Pool({
-    connectionString: DATABASE_URL,
-    ssl: {
-      rejectUnauthorized: false // For NeonDB compatibility
-    }
-  });
+  const { pool } = await import('./db');
 
   const client = await pool.connect();
 
@@ -38,8 +26,7 @@ export const logActivity = async (
     console.error('Error logging activity:', error);
     throw error;
   } finally {
-    client.release();
-    await pool.end(); // Close the pool connection
+    client.release(); // Just release the client back to the pool
   }
 };
 
@@ -51,19 +38,7 @@ export const getUserActivityLogs = async (
   limit: number = 50,
   offset: number = 0
 ) => {
-  const { Pool } = await import('pg');
-
-  const DATABASE_URL = process.env.DATABASE_URL || process.env.NEXT_PUBLIC_DATABASE_URL;
-  if (!DATABASE_URL) {
-    throw new Error('DATABASE_URL environment variable is not defined');
-  }
-
-  const pool = new Pool({
-    connectionString: DATABASE_URL,
-    ssl: {
-      rejectUnauthorized: false // For NeonDB compatibility
-    }
-  });
+  const { pool } = await import('./db');
 
   const client = await pool.connect();
 
@@ -89,8 +64,7 @@ export const getUserActivityLogs = async (
     const result = await client.query(query, params);
     return result.rows;
   } finally {
-    client.release();
-    await pool.end(); // Close the pool connection
+    client.release(); // Just release the client back to the pool
   }
 };
 
@@ -148,19 +122,7 @@ export const getAllActivityLogs = async (
 
 // Get activity statistics
 export const getActivityStats = async (userId?: string) => {
-  const { Pool } = await import('pg');
-
-  const DATABASE_URL = process.env.DATABASE_URL || process.env.NEXT_PUBLIC_DATABASE_URL;
-  if (!DATABASE_URL) {
-    throw new Error('DATABASE_URL environment variable is not defined');
-  }
-
-  const pool = new Pool({
-    connectionString: DATABASE_URL,
-    ssl: {
-      rejectUnauthorized: false // For NeonDB compatibility
-    }
-  });
+  const { pool } = await import('./db');
 
   const client = await pool.connect();
 
@@ -171,8 +133,8 @@ export const getActivityStats = async (userId?: string) => {
 
     if (userId) {
       totalQuery += ' WHERE userId = $1';
-      todayQuery += ' AND userId = $2';
-      params.push(userId, userId);
+      todayQuery += ' AND userId = $1';
+      params.push(userId);
     }
 
     const totalResult = await client.query(totalQuery, params);
@@ -183,7 +145,6 @@ export const getActivityStats = async (userId?: string) => {
       today: parseInt(todayResult.rows[0].today)
     };
   } finally {
-    client.release();
-    await pool.end(); // Close the pool connection
+    client.release(); // Just release the client back to the pool
   }
 };

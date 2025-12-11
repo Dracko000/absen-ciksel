@@ -8,19 +8,7 @@ export { UserRole, hashPassword, comparePassword, generateToken, verifyToken };
 
 // Authenticate user
 export const authenticateUser = async (email: string, password: string) => {
-  const { Pool } = await import('pg');
-
-  const DATABASE_URL = process.env.DATABASE_URL || process.env.NEXT_PUBLIC_DATABASE_URL;
-  if (!DATABASE_URL) {
-    throw new Error('DATABASE_URL environment variable is not defined');
-  }
-
-  const pool = new Pool({
-    connectionString: DATABASE_URL,
-    ssl: {
-      rejectUnauthorized: false // For NeonDB compatibility
-    }
-  });
+  const { pool } = await import('./db');
 
   const client = await pool.connect();
 
@@ -51,8 +39,7 @@ export const authenticateUser = async (email: string, password: string) => {
 
     return { user: userWithoutPassword, token };
   } finally {
-    client.release();
-    await pool.end(); // Close the pool connection
+    client.release(); // Just release the client back to the pool
   }
 };
 
@@ -65,19 +52,7 @@ export const getUserFromToken = async (token?: string) => {
   try {
     const decoded = verifyToken(token);
 
-    const { Pool } = await import('pg');
-
-    const DATABASE_URL = process.env.DATABASE_URL || process.env.NEXT_PUBLIC_DATABASE_URL;
-    if (!DATABASE_URL) {
-      throw new Error('DATABASE_URL environment variable is not defined');
-    }
-
-    const pool = new Pool({
-      connectionString: DATABASE_URL,
-      ssl: {
-        rejectUnauthorized: false // For NeonDB compatibility
-      }
-    });
+    const { pool } = await import('./db');
 
     const client = await pool.connect();
 
@@ -98,8 +73,7 @@ export const getUserFromToken = async (token?: string) => {
 
       return userWithoutPassword;
     } finally {
-      client.release();
-      await pool.end(); // Close the pool connection
+      client.release(); // Just release the client back to the pool
     }
   } catch (error) {
     throw new Error('Invalid or expired token');
@@ -116,19 +90,7 @@ export const checkAuthorization = (
 
 // Check if user exists by email
 export const checkUserExists = async (email: string): Promise<boolean> => {
-  const { Pool } = await import('pg');
-
-  const DATABASE_URL = process.env.DATABASE_URL || process.env.NEXT_PUBLIC_DATABASE_URL;
-  if (!DATABASE_URL) {
-    throw new Error('DATABASE_URL environment variable is not defined');
-  }
-
-  const pool = new Pool({
-    connectionString: DATABASE_URL,
-    ssl: {
-      rejectUnauthorized: false // For NeonDB compatibility
-    }
-  });
+  const { pool } = await import('./db');
 
   const client = await pool.connect();
 
@@ -140,8 +102,7 @@ export const checkUserExists = async (email: string): Promise<boolean> => {
 
     return result.rows.length > 0;
   } finally {
-    client.release();
-    await pool.end(); // Close the pool connection
+    client.release(); // Just release the client back to the pool
   }
 };
 
@@ -170,19 +131,7 @@ export const createUser = async (
     role
   });
 
-  const { Pool } = await import('pg');
-
-  const DATABASE_URL = process.env.DATABASE_URL || process.env.NEXT_PUBLIC_DATABASE_URL;
-  if (!DATABASE_URL) {
-    throw new Error('DATABASE_URL environment variable is not defined');
-  }
-
-  const pool = new Pool({
-    connectionString: DATABASE_URL,
-    ssl: {
-      rejectUnauthorized: false // For NeonDB compatibility
-    }
-  });
+  const { pool } = await import('./db');
 
   const client = await pool.connect();
 
@@ -199,7 +148,6 @@ export const createUser = async (
 
     return userWithoutPassword;
   } finally {
-    client.release();
-    await pool.end(); // Close the pool connection
+    client.release(); // Just release the client back to the pool
   }
 };
