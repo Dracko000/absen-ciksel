@@ -11,6 +11,7 @@
     "seed-db": "tsx scripts/seed-db.ts",
     "verify-db": "tsx scripts/verify-db.ts",
     "generate-token": "node scripts/generate-token.js",
+    "generate-pwa-icons": "bash scripts/generate-pwa-icons.sh",
     "build:pwa": "ANALYZE=false NODE_ENV=production next build --webpack",
     "analyze": "ANALYZE=true NODE_ENV=production next build --webpack"
   },

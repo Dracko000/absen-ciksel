@@ -1,31 +1,12 @@
 # Deployment Notes for Absensi Sekolah
 
-## Prisma + Next.js Compatibility
+## Application Stack
 
 The application uses:
-- Next.js 16 (beta version with Turbopack)
-- Prisma v7
-
-### Known Issue:
-There is a compatibility issue between Next.js 16 (Turbopack) and Prisma v7 that prevents successful static builds. This is a known issue with the beta version of Next.js 16.
-
-### Workarounds:
-
-#### Option 1: Development Mode
-The application runs perfectly in development mode:
-```bash
-npm run dev
-```
-
-#### Option 2: Production with Node.js Server
-For production deployment, use server-side rendering instead of static export:
-1. Remove or modify the `output: 'export'` from `next.config.ts`
-2. Deploy using `npm run build` followed by `npm start`
-
-#### Option 3: Stable Versions (Recommended for Production)
-For static export capability, consider using:
-- Next.js 14 or 15 (stable versions)
-- Prisma v4 or v5
+- Next.js 16 (with webpack for compatibility)
+- PostgreSQL database (direct connection, not Prisma)
+- next-pwa for PWA functionality
+- Tailwind CSS for styling
 
 ## Application Features
 
@@ -38,25 +19,50 @@ All features from the professional prompt have been implemented:
 ✅ Excel export functionality
 ✅ PWA support
 ✅ Activity logging
-✅ Database with PostgreSQL via Prisma
+✅ Database with PostgreSQL
 ✅ Responsive UI with Tailwind CSS
+✅ Optimized performance with caching
 
 ## Environment Variables Required
 
 Create a `.env` file with:
 ```
-DATABASE_URL="prisma+postgres://accelerate.prisma-data.net/?api_key=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqd3RfaWQiOjEsInNlY3VyZV9rZXkiOiJza196WDhzQTM2V2ZlT29oQ0pHLTJlbWwiLCJhcGlfa2V5IjoiMDFLQzVYNzJLQUowUVE3WlRXWEYyWFBIRFAiLCJ0ZW5hbnRfaWQiOiJlOGQ3MmVkM2E1MTczZmU1OTdlYmU5MzQyNmQ3MDcwZGYzYmE1ZWUzYzRjZDRjMDRlZTBhNDhmMDIyNTU4MmNmIiwiaW50ZXJuYWxfc2VjcmV0IjoiODBiZGM5YjgtY2VmNS00M2U2LTlmZWItOTM5NDE0OThmZDgxIn0.JMjRz-tJKWprwfMJSI_WI8vjk56oPOKNT9557hN1mnc"
-JWT_SECRET=f65d27eaab77d606690346d5f7726124
+DATABASE_URL="postgresql://username:password@host:port/database_name"
+NEXT_PUBLIC_DATABASE_URL="postgresql://username:password@host:port/database_name"
+JWT_SECRET="your-jwt-secret-here"
+NEXT_PUBLIC_JWT_SECRET="your-jwt-secret-here"
+# Super admin registration token - keep this secure and do not expose
+SUPERADMIN_REGISTRATION_TOKEN="your-superadmin-registration-token-here"
 ```
 
 ## Database Setup
 
 Run these commands to set up the database:
 ```bash
-npx prisma db push
-# or for the first time:
-npx prisma migrate dev
+npm run init-db  # Initialize the database tables
+npm run seed-db  # Populate with sample data (optional)
 ```
+
+## Progressive Web App (PWA) Features
+
+### PWA Configuration:
+- Service worker is automatically generated at build time
+- Web app manifest is configured in `public/manifest.json`
+- Icons are configured for various device sizes
+- Caching strategy implemented for offline functionality
+
+### PWA Installation:
+Users can install the app on their devices by:
+1. Visiting the website in Chrome, Edge, or other Chromium-based browsers
+2. Clicking the install button in the address bar
+3. Or using the "Add to Home Screen" option
+
+### PWA Icons:
+Replace the placeholder icon files in the `public/` directory:
+- `icon-192x192.png`
+- `icon-256x256.png`
+- `icon-384x384.png`
+- `icon-512x512.png`
 
 ## Running the Application
 
@@ -65,10 +71,35 @@ npx prisma migrate dev
 npm run dev
 ```
 
-### Production (Server-side):
+### Production:
 ```bash
 npm run build
 npm start
 ```
 
-The application is fully functional with all required features implemented according to the professional prompt. The only limitation is the static export compatibility issue between Next.js 16 and Prisma v7.
+### PWA Build (for analysis):
+```bash
+npm run build:pwa  # Standard PWA build
+npm run analyze    # Build with bundle analysis
+```
+
+## Super Admin Registration
+
+To create the first super admin account:
+1. Generate a token: `npm run generate-token`
+2. Add it to your `.env` file: `SUPERADMIN_REGISTRATION_TOKEN="generated-token"`
+3. Access the registration page: `https://yourdomain.com/register-superadmin?token=generated-token`
+
+## Deployment Considerations
+
+### For Web Deployment:
+- Ensure HTTPS is enabled (required for PWA features)
+- Service workers require HTTPS in production
+- Properly configure caching headers for static assets
+
+### For Mobile App Installation:
+- The app will be installable on mobile devices
+- Offline functionality is available for cached content
+- Push notifications can be implemented (not currently included)
+
+The application is now fully configured as a Progressive Web App with all required features implemented and performance optimizations in place.
