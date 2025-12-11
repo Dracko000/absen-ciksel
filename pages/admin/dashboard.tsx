@@ -26,7 +26,7 @@ const AdminDashboard = () => {
         setStudentStats(studentStatsData);
 
         // Get recent attendance records
-        const recentAttendanceData = await getAttendanceByType('MURID', state.user?.id, startOfDay, endOfDay);
+        const recentAttendanceData = await getAttendanceByType('MURID', state.user.id, startOfDay, endOfDay);
         setRecentAttendance(recentAttendanceData.slice(0, 5)); // Show only first 5
       } catch (error) {
         console.error('Error fetching dashboard stats:', error);

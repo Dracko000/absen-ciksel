@@ -27,7 +27,7 @@ const ViewStudentAttendance = () => {
         const end = new Date(dateRange.endDate);
         end.setHours(23, 59, 59, 999);
 
-        const records = await getAttendanceByType('MURID', state.user?.id, start, end);
+        const records = await getAttendanceByType('MURID', state.user.id, start, end);
         setAttendanceRecords(records);
       } catch (error) {
         console.error('Error fetching attendance:', error);
