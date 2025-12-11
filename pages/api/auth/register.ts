@@ -1,7 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { createUser, UserRole } from '@/lib/auth';
 import { logActivity } from '@/lib/activity';
-import db from '@/lib/db';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -18,7 +17,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Check if user with email already exists
-    const client = await db.connect();
+    const { Pool } = await import('pg');
+    const { DATABASE_URL } = await import('process');
+
+    const pool = new Pool({
+      connectionString: DATABASE_URL,
+      ssl: {
+        rejectUnauthorized: false // For NeonDB compatibility
+      }
+    });
+
+    const client = await pool.connect();
     try {
       const result = await client.query('SELECT * FROM users WHERE email = $1', [email]);
       if (result.rows.length > 0) {
@@ -26,6 +35,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     } finally {
       client.release();
+      await pool.end(); // Close the pool connection
     }
 
     // Only superadmin can create other superadmins and admins

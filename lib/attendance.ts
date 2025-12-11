@@ -1,8 +1,19 @@
-import db from '@/lib/db';
+import { v4 as uuidv4 } from 'uuid';
+// Note: PostgreSQL client is imported dynamically in functions that run server-side only
 
 // Get attendance records for a specific user
 export const getUserAttendance = async (userId: string, startDate?: Date, endDate?: Date) => {
-  const client = await db.connect();
+  const { Pool } = await import('pg');
+  const { DATABASE_URL } = await import('process');
+
+  const pool = new Pool({
+    connectionString: DATABASE_URL,
+    ssl: {
+      rejectUnauthorized: false // For NeonDB compatibility
+    }
+  });
+
+  const client = await pool.connect();
 
   try {
     let query = `
@@ -26,12 +37,23 @@ export const getUserAttendance = async (userId: string, startDate?: Date, endDat
     return result.rows;
   } finally {
     client.release();
+    await pool.end(); // Close the pool connection
   }
 };
 
 // Get attendance records by type (teacher or student) for admin/superadmin
 export const getAttendanceByType = async (attendanceType: string, recordedBy?: string, startDate?: Date, endDate?: Date) => {
-  const client = await db.connect();
+  const { Pool } = await import('pg');
+  const { DATABASE_URL } = await import('process');
+
+  const pool = new Pool({
+    connectionString: DATABASE_URL,
+    ssl: {
+      rejectUnauthorized: false // For NeonDB compatibility
+    }
+  });
+
+  const client = await pool.connect();
 
   try {
     let query = `
@@ -61,12 +83,23 @@ export const getAttendanceByType = async (attendanceType: string, recordedBy?: s
     return result.rows;
   } finally {
     client.release();
+    await pool.end(); // Close the pool connection
   }
 };
 
 // Get attendance statistics
 export const getAttendanceStats = async (userId: string, attendanceType?: string, date?: Date) => {
-  const client = await db.connect();
+  const { Pool } = await import('pg');
+  const { DATABASE_URL } = await import('process');
+
+  const pool = new Pool({
+    connectionString: DATABASE_URL,
+    ssl: {
+      rejectUnauthorized: false // For NeonDB compatibility
+    }
+  });
+
+  const client = await pool.connect();
 
   try {
     let query = 'SELECT status, date FROM attendance WHERE userId = $1';
@@ -95,12 +128,23 @@ export const getAttendanceStats = async (userId: string, attendanceType?: string
     return result.rows;
   } finally {
     client.release();
+    await pool.end(); // Close the pool connection
   }
 };
 
 // Get attendance summary for dashboard
 export const getAttendanceSummary = async (attendanceType: string, startDate?: Date, endDate?: Date) => {
-  const client = await db.connect();
+  const { Pool } = await import('pg');
+  const { DATABASE_URL } = await import('process');
+
+  const pool = new Pool({
+    connectionString: DATABASE_URL,
+    ssl: {
+      rejectUnauthorized: false // For NeonDB compatibility
+    }
+  });
+
+  const client = await pool.connect();
 
   try {
     // Get total count
@@ -168,12 +212,23 @@ export const getAttendanceSummary = async (attendanceType: string, startDate?: D
     };
   } finally {
     client.release();
+    await pool.end(); // Close the pool connection
   }
 };
 
 // Get today's attendance for a user
 export const getTodaysAttendance = async (userId: string, attendanceType: string) => {
-  const client = await db.connect();
+  const { Pool } = await import('pg');
+  const { DATABASE_URL } = await import('process');
+
+  const pool = new Pool({
+    connectionString: DATABASE_URL,
+    ssl: {
+      rejectUnauthorized: false // For NeonDB compatibility
+    }
+  });
+
+  const client = await pool.connect();
 
   try {
     const today = new Date();
@@ -193,5 +248,6 @@ export const getTodaysAttendance = async (userId: string, attendanceType: string
     return result.rows;
   } finally {
     client.release();
+    await pool.end(); // Close the pool connection
   }
 };

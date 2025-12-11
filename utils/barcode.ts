@@ -1,5 +1,5 @@
 // Barcode utility functions
-import db from '@/lib/db';
+// Note: PostgreSQL client is used dynamically in functions that run server-side only
 
 // Generate user barcode data containing user ID, name and role
 export const generateBarcodeData = (userId: string, name: string, role: string): string => {
@@ -38,7 +38,17 @@ export const validateUserFromBarcode = async (barcodeData: string) => {
   }
 
   // Find user in database
-  const client = await db.connect();
+  const { Pool } = await import('pg');
+  const { DATABASE_URL } = await import('process');
+
+  const pool = new Pool({
+    connectionString: DATABASE_URL,
+    ssl: {
+      rejectUnauthorized: false // For NeonDB compatibility
+    }
+  });
+
+  const client = await pool.connect();
 
   try {
     const result = await client.query(
@@ -59,12 +69,23 @@ export const validateUserFromBarcode = async (barcodeData: string) => {
     return user;
   } finally {
     client.release();
+    await pool.end(); // Close the pool connection
   }
 };
 
 // Validate user by ID (alternative to barcode)
 export const validateUserById = async (userId: string) => {
-  const client = await db.connect();
+  const { Pool } = await import('pg');
+  const { DATABASE_URL } = await import('process');
+
+  const pool = new Pool({
+    connectionString: DATABASE_URL,
+    ssl: {
+      rejectUnauthorized: false // For NeonDB compatibility
+    }
+  });
+
+  const client = await pool.connect();
 
   try {
     const result = await client.query(
@@ -85,5 +106,6 @@ export const validateUserById = async (userId: string) => {
     return user;
   } finally {
     client.release();
+    await pool.end(); // Close the pool connection
   }
 };

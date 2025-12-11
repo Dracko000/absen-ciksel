@@ -1,7 +1,7 @@
 import { sign, verify } from 'jsonwebtoken';
 import { compare, hash } from 'bcryptjs';
-import db from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
+// Note: PostgreSQL client is dynamically imported in functions that run server-side only
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_for_development';
 
@@ -38,7 +38,17 @@ export const comparePassword = async (password: string, hashedPassword: string) 
 
 // Authenticate user
 export const authenticateUser = async (email: string, password: string) => {
-  const client = await db.connect();
+  const { Pool } = await import('pg');
+  const { DATABASE_URL } = await import('process');
+
+  const pool = new Pool({
+    connectionString: DATABASE_URL,
+    ssl: {
+      rejectUnauthorized: false // For NeonDB compatibility
+    }
+  });
+
+  const client = await pool.connect();
 
   try {
     const result = await client.query(
@@ -68,6 +78,7 @@ export const authenticateUser = async (email: string, password: string) => {
     return { user: userWithoutPassword, token };
   } finally {
     client.release();
+    await pool.end(); // Close the pool connection
   }
 };
 
@@ -79,7 +90,18 @@ export const getUserFromToken = async (token?: string) => {
 
   try {
     const decoded = verifyToken(token);
-    const client = await db.connect();
+
+    const { Pool } = await import('pg');
+    const { DATABASE_URL } = await import('process');
+
+    const pool = new Pool({
+      connectionString: DATABASE_URL,
+      ssl: {
+        rejectUnauthorized: false // For NeonDB compatibility
+      }
+    });
+
+    const client = await pool.connect();
 
     try {
       const result = await client.query(
@@ -99,6 +121,7 @@ export const getUserFromToken = async (token?: string) => {
       return userWithoutPassword;
     } finally {
       client.release();
+      await pool.end(); // Close the pool connection
     }
   } catch (error) {
     throw new Error('Invalid or expired token');
@@ -132,7 +155,17 @@ export const createUser = async (
     role
   });
 
-  const client = await db.connect();
+  const { Pool } = await import('pg');
+  const { DATABASE_URL } = await import('process');
+
+  const pool = new Pool({
+    connectionString: DATABASE_URL,
+    ssl: {
+      rejectUnauthorized: false // For NeonDB compatibility
+    }
+  });
+
+  const client = await pool.connect();
 
   try {
     const result = await client.query(
@@ -148,5 +181,6 @@ export const createUser = async (
     return userWithoutPassword;
   } finally {
     client.release();
+    await pool.end(); // Close the pool connection
   }
 };

@@ -1,7 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getUserFromToken } from '@/lib/auth';
 import { v4 as uuidv4 } from 'uuid';
-import db from '@/lib/db';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -27,7 +26,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    const client = await db.connect();
+    const { Pool } = await import('pg');
+    const { DATABASE_URL } = await import('process');
+    
+    const pool = new Pool({
+      connectionString: DATABASE_URL,
+      ssl: {
+        rejectUnauthorized: false // For NeonDB compatibility
+      }
+    });
+
+    const client = await pool.connect();
     
     try {
       // Insert attendance record
@@ -44,6 +53,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     } finally {
       client.release();
+      await pool.end(); // Close the pool connection
     }
   } catch (error: any) {
     res.status(500).json({ 

@@ -1,5 +1,5 @@
-import db from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
+// Note: PostgreSQL client is imported dynamically in functions that run server-side only
 
 // Log user activity
 export const logActivity = async (
@@ -9,7 +9,17 @@ export const logActivity = async (
   ipAddress?: string,
   userAgent?: string
 ) => {
-  const client = await db.connect();
+  const { Pool } = await import('pg');
+  const { DATABASE_URL } = await import('process');
+
+  const pool = new Pool({
+    connectionString: DATABASE_URL,
+    ssl: {
+      rejectUnauthorized: false // For NeonDB compatibility
+    }
+  });
+
+  const client = await pool.connect();
 
   try {
     const result = await client.query(
@@ -25,6 +35,7 @@ export const logActivity = async (
     throw error;
   } finally {
     client.release();
+    await pool.end(); // Close the pool connection
   }
 };
 
@@ -36,7 +47,17 @@ export const getUserActivityLogs = async (
   limit: number = 50,
   offset: number = 0
 ) => {
-  const client = await db.connect();
+  const { Pool } = await import('pg');
+  const { DATABASE_URL } = await import('process');
+
+  const pool = new Pool({
+    connectionString: DATABASE_URL,
+    ssl: {
+      rejectUnauthorized: false // For NeonDB compatibility
+    }
+  });
+
+  const client = await pool.connect();
 
   try {
     let query = `
@@ -61,6 +82,7 @@ export const getUserActivityLogs = async (
     return result.rows;
   } finally {
     client.release();
+    await pool.end(); // Close the pool connection
   }
 };
 
@@ -71,7 +93,17 @@ export const getAllActivityLogs = async (
   limit: number = 50,
   offset: number = 0
 ) => {
-  const client = await db.connect();
+  const { Pool } = await import('pg');
+  const { DATABASE_URL } = await import('process');
+
+  const pool = new Pool({
+    connectionString: DATABASE_URL,
+    ssl: {
+      rejectUnauthorized: false // For NeonDB compatibility
+    }
+  });
+
+  const client = await pool.connect();
 
   try {
     let query = `
@@ -97,12 +129,23 @@ export const getAllActivityLogs = async (
     return result.rows;
   } finally {
     client.release();
+    await pool.end(); // Close the pool connection
   }
 };
 
 // Get activity statistics
 export const getActivityStats = async (userId?: string) => {
-  const client = await db.connect();
+  const { Pool } = await import('pg');
+  const { DATABASE_URL } = await import('process');
+
+  const pool = new Pool({
+    connectionString: DATABASE_URL,
+    ssl: {
+      rejectUnauthorized: false // For NeonDB compatibility
+    }
+  });
+
+  const client = await pool.connect();
 
   try {
     let totalQuery = 'SELECT COUNT(*) as total FROM activity_logs';
@@ -124,5 +167,6 @@ export const getActivityStats = async (userId?: string) => {
     };
   } finally {
     client.release();
+    await pool.end(); // Close the pool connection
   }
 };
