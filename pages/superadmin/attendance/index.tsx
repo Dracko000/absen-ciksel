@@ -1,8 +1,15 @@
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import Layout from '@/components/layout/Layout';
-import BarcodeScanner from '@/components/barcode/BarcodeScanner';
+import dynamic from 'next/dynamic';
 import { UserRole } from '@/lib/auth';
 import { useAuth } from '@/context/AuthContext';
+
+// Dynamically import the barcode scanner to reduce initial bundle size
+const BarcodeScanner = dynamic(() => import('@/components/barcode/BarcodeScanner'), {
+  loading: () => <p>Loading scanner...</p>,
+  ssr: false // Don't render on server side
+});
 
 const TakeTeacherAttendance = () => {
   const { state } = useAuth();

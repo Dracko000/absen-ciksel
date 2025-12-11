@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/utils/withAuth';
 import { getAllActivityLogs, getActivityStats } from '@/lib/activity';
+import { cache } from '@/lib/cache';
 
 // Define types
 type ActivityLog = {
@@ -34,6 +35,15 @@ const handler = async (req: NextApiRequest, res: NextApiResponse<ApiResponse>) =
   try {
     const { startDate, endDate, limit = '50', offset = '0' } = req.query;
 
+    // Create cache key based on parameters
+    const cacheKey = `activity_logs_${startDate}_${endDate}_${limit}_${offset}`;
+
+    // Try to get from cache first
+    const cachedResult = cache.get(cacheKey);
+    if (cachedResult) {
+      return res.status(200).json({ success: true, logs: cachedResult.logs, stats: cachedResult.stats });
+    }
+
     // Parse date range if provided
     let parsedStartDate: Date | undefined;
     let parsedEndDate: Date | undefined;
@@ -54,6 +64,11 @@ const handler = async (req: NextApiRequest, res: NextApiResponse<ApiResponse>) =
     );
 
     const stats = await getActivityStats();
+
+    const result = { logs, stats };
+
+    // Cache the result for 2 minutes (120,000 ms) since activity logs change frequently
+    cache.set(cacheKey, result, 120000);
 
     return res.status(200).json({ success: true, logs, stats });
   } catch (error: any) {

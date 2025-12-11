@@ -9,7 +9,8 @@
     "lint": "eslint",
     "init-db": "tsx scripts/init-db.ts",
     "seed-db": "tsx scripts/seed-db.ts",
-    "verify-db": "tsx scripts/verify-db.ts"
+    "verify-db": "tsx scripts/verify-db.ts",
+    "generate-token": "node scripts/generate-token.js"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
@@ -29,6 +30,7 @@
     "zod": "^4.1.13"
   },
   "devDependencies": {
+    "@next/bundle-analyzer": "^16.0.8",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20.19.26",
     "@types/pg": "^8.16.0",

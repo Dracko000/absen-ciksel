@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/utils/withAuth';
 import { getUserAttendance } from '@/lib/attendance';
+import { cache } from '@/lib/cache';
 
 // Define types
 type AttendanceRecord = {
@@ -35,6 +36,15 @@ const handler = async (req: NextApiRequest, res: NextApiResponse<ApiResponse>) =
       return res.status(400).json({ success: false, error: 'User ID is required' });
     }
 
+    // Create cache key based on parameters
+    const cacheKey = `attendance_user_${userId}_${startDate}_${endDate}`;
+
+    // Try to get from cache first
+    const cachedResult = cache.get(cacheKey);
+    if (cachedResult) {
+      return res.status(200).json({ success: true, data: cachedResult });
+    }
+
     // Parse date range if provided
     let parsedStartDate: Date | undefined;
     let parsedEndDate: Date | undefined;
@@ -49,6 +59,9 @@ const handler = async (req: NextApiRequest, res: NextApiResponse<ApiResponse>) =
 
     // Fetch attendance records
     const records = await getUserAttendance(userId as string, parsedStartDate, parsedEndDate);
+
+    // Cache the result for 5 minutes (300,000 ms)
+    cache.set(cacheKey, records, 300000);
 
     return res.status(200).json({ success: true, data: records });
   } catch (error: any) {

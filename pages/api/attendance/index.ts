@@ -1,10 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/utils/withAuth';
-import { 
-  getAttendanceStats, 
+import {
+  getAttendanceStats,
   getAttendanceSummary,
   getTodaysAttendance
 } from '@/lib/attendance';
+import { cache } from '@/lib/cache';
 
 // Define types
 type AttendanceRecord = {
@@ -37,9 +38,16 @@ const handler = async (req: NextApiRequest, res: NextApiResponse<ApiResponse>) =
     switch (operation) {
       case 'stats': {
         const { userId, attendanceType, date } = req.query;
-        
+
         if (!userId) {
           return res.status(400).json({ success: false, error: 'User ID is required' });
+        }
+
+        // Create cache key
+        const cacheKey = `attendance_stats_${userId}_${attendanceType}_${date}`;
+        const cachedResult = cache.get(cacheKey);
+        if (cachedResult) {
+          return res.status(200).json({ success: true, data: cachedResult });
         }
 
         let parsedDate: Date | undefined;
@@ -53,6 +61,9 @@ const handler = async (req: NextApiRequest, res: NextApiResponse<ApiResponse>) =
           parsedDate
         );
 
+        // Cache for 10 minutes
+        cache.set(cacheKey, stats, 600000);
+
         return res.status(200).json({ success: true, data: stats });
       }
 
@@ -61,6 +72,13 @@ const handler = async (req: NextApiRequest, res: NextApiResponse<ApiResponse>) =
 
         if (!attendanceType) {
           return res.status(400).json({ success: false, error: 'Attendance type is required' });
+        }
+
+        // Create cache key
+        const cacheKey = `attendance_summary_${attendanceType}_${startDate}_${endDate}`;
+        const cachedResult = cache.get(cacheKey);
+        if (cachedResult) {
+          return res.status(200).json({ success: true, data: cachedResult });
         }
 
         let parsedStartDate: Date | undefined;
@@ -80,6 +98,9 @@ const handler = async (req: NextApiRequest, res: NextApiResponse<ApiResponse>) =
           parsedEndDate
         );
 
+        // Cache for 5 minutes
+        cache.set(cacheKey, summary, 300000);
+
         return res.status(200).json({ success: true, data: summary });
       }
 
@@ -90,7 +111,17 @@ const handler = async (req: NextApiRequest, res: NextApiResponse<ApiResponse>) =
           return res.status(400).json({ success: false, error: 'User ID and attendance type are required' });
         }
 
+        // Create cache key
+        const cacheKey = `attendance_today_${userId}_${attendanceType}`;
+        const cachedResult = cache.get(cacheKey);
+        if (cachedResult) {
+          return res.status(200).json({ success: true, data: cachedResult });
+        }
+
         const records = await getTodaysAttendance(userId as string, attendanceType as string);
+
+        // Cache for 1 hour (3,600,000 ms) since today's attendance doesn't change frequently
+        cache.set(cacheKey, records, 3600000);
 
         return res.status(200).json({ success: true, data: records });
       }

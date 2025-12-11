@@ -21,7 +21,8 @@ export const getUserAttendance = async (userId: string, startDate?: Date, endDat
 
   try {
     let query = `
-      SELECT a.*, u.name, u.userId
+      SELECT a.id, a.userId, a.date, a.status, a.note, a.recordedBy, a.attendanceType,
+             u.name, u.userId as userUserId
       FROM attendance a
       JOIN users u ON a.userId = u.id
       WHERE a.userId = $1
@@ -35,7 +36,7 @@ export const getUserAttendance = async (userId: string, startDate?: Date, endDat
       paramIndex += 2;
     }
 
-    query += ` ORDER BY a.date DESC`;
+    query += ` ORDER BY a.date DESC LIMIT 100`; // Add limit to prevent large result sets
 
     const result = await client.query(query, params);
     return result.rows;
@@ -65,7 +66,8 @@ export const getAttendanceByType = async (attendanceType: string, recordedBy?: s
 
   try {
     let query = `
-      SELECT a.*, u.name, u.userId, u.email
+      SELECT a.id, a.userId, a.date, a.status, a.note, a.recordedBy, a.attendanceType,
+             u.name, u.userId as userUserId, u.email
       FROM attendance a
       JOIN users u ON a.userId = u.id
       WHERE a.attendanceType = $1
@@ -85,7 +87,7 @@ export const getAttendanceByType = async (attendanceType: string, recordedBy?: s
       paramIndex += 2;
     }
 
-    query += ` ORDER BY a.date DESC`;
+    query += ` ORDER BY a.date DESC LIMIT 200`; // Add limit to prevent large result sets
 
     const result = await client.query(query, params);
     return result.rows;

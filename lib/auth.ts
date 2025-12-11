@@ -114,6 +114,37 @@ export const checkAuthorization = (
   return requiredRoles.includes(userRole);
 };
 
+// Check if user exists by email
+export const checkUserExists = async (email: string): Promise<boolean> => {
+  const { Pool } = await import('pg');
+
+  const DATABASE_URL = process.env.DATABASE_URL || process.env.NEXT_PUBLIC_DATABASE_URL;
+  if (!DATABASE_URL) {
+    throw new Error('DATABASE_URL environment variable is not defined');
+  }
+
+  const pool = new Pool({
+    connectionString: DATABASE_URL,
+    ssl: {
+      rejectUnauthorized: false // For NeonDB compatibility
+    }
+  });
+
+  const client = await pool.connect();
+
+  try {
+    const result = await client.query(
+      'SELECT id FROM users WHERE email = $1',
+      [email]
+    );
+
+    return result.rows.length > 0;
+  } finally {
+    client.release();
+    await pool.end(); // Close the pool connection
+  }
+};
+
 // Create user
 export const createUser = async (
   userId: string,
@@ -124,6 +155,12 @@ export const createUser = async (
   classId?: string,
   subject?: string
 ) => {
+  // Check if user already exists
+  const exists = await checkUserExists(email);
+  if (exists) {
+    throw new Error(`User with email ${email} already exists`);
+  }
+
   const hashedPassword = await hashPassword(password);
 
   // Create barcode data containing user info

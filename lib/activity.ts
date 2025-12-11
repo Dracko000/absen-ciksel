@@ -119,7 +119,8 @@ export const getAllActivityLogs = async (
 
   try {
     let query = `
-      SELECT al.*, u.name, u.email, u.role
+      SELECT al.id, al.userId, al.action, al.description, al.ipAddress, al.userAgent, al.timestamp,
+             u.name, u.email, u.role
       FROM activity_logs al
       JOIN users u ON al.userId = u.id
     `;
@@ -135,7 +136,7 @@ export const getAllActivityLogs = async (
     }
 
     query += ` ORDER BY al.timestamp DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
-    params.push(limit, offset);
+    params.push(Math.min(limit, 100), offset); // Cap the limit to prevent excessive data loading
 
     const result = await client.query(query, params);
     return result.rows;
