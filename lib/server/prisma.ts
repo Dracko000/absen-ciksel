@@ -1,13 +1,11 @@
-import 'dotenv/config'
-import { defineConfig, env } from 'prisma/config'
+import { PrismaClient } from '@prisma/client'
 
-export default defineConfig({
-  schema: 'prisma/schema.prisma',
-  migrations: {
-    path: 'prisma/migrations',
-  },
-  datasource: {
-    url: env('DATABASE_URL'),
-  },
-})
+declare global {
+  var prisma: PrismaClient | undefined
+}
+
+const client = global.prisma || new PrismaClient()
+if (process.env.NODE_ENV !== 'production') global.prisma = client
+
+export default client
         
