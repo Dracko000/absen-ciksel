@@ -1,13 +1,19 @@
 import { useState, useEffect } from 'react';
-import { withAuth } from '@/utils/withAuth';
 import Layout from '@/components/layout/Layout';
-import { getUserAttendance } from '@/lib/attendance';
 import { exportAttendanceToExcel } from '@/lib/excel';
 import { UserRole } from '@/lib/auth';
 import { useAuth } from '@/context/AuthContext';
 
 const UserReports = () => {
   const { state } = useAuth();
+
+  // Check authentication and role on the client-side
+  useEffect(() => {
+    if (state.user && state.user.role !== UserRole.USER) {
+      // Redirect unauthorized users
+      window.location.href = '/unauthorized';
+    }
+  }, [state.user]);
   const [loading, setLoading] = useState(false);
   const [dateRange, setDateRange] = useState<{ startDate: string; endDate: string }>({
     startDate: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0], // 30 days ago
@@ -58,12 +64,36 @@ const UserReports = () => {
         end.setHours(23, 59, 59, 999);
       }
       
-      // Fetch attendance records for this user
-      const attendanceRecords = await getUserAttendance(state.user.id, start, end);
-      
+      const token = localStorage.getItem('token'); // Get token from local storage
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      // Fetch attendance records for this user via API
+      const response = await fetch(
+        `/api/attendance/user?userId=${state.user.id}&startDate=${encodeURIComponent(start.toISOString())}&endDate=${encodeURIComponent(end.toISOString())}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch attendance records');
+      }
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to fetch attendance records');
+      }
+      const attendanceRecords = data.data || [];
+
       // Create date string for filename
       const dateStr = `${start.toISOString().split('T')[0]}_to_${end.toISOString().split('T')[0]}`;
-      
+
       // Export attendance records
       exportAttendanceToExcel(attendanceRecords, `Laporan_Kehadiran_Saya_${type}_${dateStr}`, 'MURID');
       
@@ -154,4 +184,4 @@ const UserReports = () => {
   );
 };
 
-export default withAuth(UserReports, { requiredRoles: [UserRole.USER] });
+export default UserReports;

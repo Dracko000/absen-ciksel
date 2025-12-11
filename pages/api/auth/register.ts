@@ -18,7 +18,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Check if user with email already exists
     const { Pool } = await import('pg');
-    const { DATABASE_URL } = await import('process');
+    const DATABASE_URL = process.env.DATABASE_URL || process.env.NEXT_PUBLIC_DATABASE_URL;
+    if (!DATABASE_URL) {
+      throw new Error('DATABASE_URL environment variable is not defined');
+    }
 
     const pool = new Pool({
       connectionString: DATABASE_URL,

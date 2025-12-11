@@ -8,6 +8,20 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true // For static exports
   },
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      // Don't include server-only dependencies in client builds
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+        dns: false,
+      };
+    }
+
+    return config;
+  },
 };
 
 export default nextConfig;

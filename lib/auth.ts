@@ -1,45 +1,19 @@
-import { sign, verify } from 'jsonwebtoken';
-import { compare, hash } from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
+import { generateToken, verifyToken, hashPassword, comparePassword, UserRole } from './jwt';
+
+// Re-export functions so other modules can import them from auth
+export { UserRole, hashPassword, comparePassword, generateToken, verifyToken };
+
 // Note: PostgreSQL client is dynamically imported in functions that run server-side only
-
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_for_development';
-
-// Define user roles
-export enum UserRole {
-  SUPERADMIN = 'SUPERADMIN',
-  ADMIN = 'ADMIN',
-  USER = 'USER'
-}
-
-// Generate JWT token
-export const generateToken = (payload: { id: string; email: string; role: UserRole }) => {
-  return sign(payload, JWT_SECRET, { expiresIn: '24h' });
-};
-
-// Verify JWT token
-export const verifyToken = (token: string) => {
-  try {
-    return verify(token, JWT_SECRET) as { id: string; email: string; role: UserRole };
-  } catch (error) {
-    throw new Error('Invalid token');
-  }
-};
-
-// Hash password
-export const hashPassword = async (password: string) => {
-  return await hash(password, 12);
-};
-
-// Compare password
-export const comparePassword = async (password: string, hashedPassword: string) => {
-  return await compare(password, hashedPassword);
-};
 
 // Authenticate user
 export const authenticateUser = async (email: string, password: string) => {
   const { Pool } = await import('pg');
-  const { DATABASE_URL } = await import('process');
+
+  const DATABASE_URL = process.env.DATABASE_URL || process.env.NEXT_PUBLIC_DATABASE_URL;
+  if (!DATABASE_URL) {
+    throw new Error('DATABASE_URL environment variable is not defined');
+  }
 
   const pool = new Pool({
     connectionString: DATABASE_URL,
@@ -92,7 +66,11 @@ export const getUserFromToken = async (token?: string) => {
     const decoded = verifyToken(token);
 
     const { Pool } = await import('pg');
-    const { DATABASE_URL } = await import('process');
+
+    const DATABASE_URL = process.env.DATABASE_URL || process.env.NEXT_PUBLIC_DATABASE_URL;
+    if (!DATABASE_URL) {
+      throw new Error('DATABASE_URL environment variable is not defined');
+    }
 
     const pool = new Pool({
       connectionString: DATABASE_URL,
@@ -156,7 +134,11 @@ export const createUser = async (
   });
 
   const { Pool } = await import('pg');
-  const { DATABASE_URL } = await import('process');
+
+  const DATABASE_URL = process.env.DATABASE_URL || process.env.NEXT_PUBLIC_DATABASE_URL;
+  if (!DATABASE_URL) {
+    throw new Error('DATABASE_URL environment variable is not defined');
+  }
 
   const pool = new Pool({
     connectionString: DATABASE_URL,

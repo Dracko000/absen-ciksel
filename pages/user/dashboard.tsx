@@ -1,12 +1,18 @@
 import { useState, useEffect } from 'react';
-import { withAuth } from '@/utils/withAuth';
 import Layout from '@/components/layout/Layout';
 import { UserRole } from '@/lib/auth';
-import { getUserAttendance } from '@/lib/attendance';
 import { useAuth } from '@/context/AuthContext';
 
 const UserDashboard = () => {
   const { state } = useAuth();
+
+  // Check authentication and role on the client-side
+  useEffect(() => {
+    if (state.user && state.user.role !== UserRole.USER) {
+      // Redirect unauthorized users
+      window.location.href = '/unauthorized';
+    }
+  }, [state.user]);
   const [attendanceStats, setAttendanceStats] = useState<any>(null);
   const [recentAttendance, setRecentAttendance] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -14,13 +20,22 @@ const UserDashboard = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        // Get user's attendance for the current month
+        // Get user's attendance for the current month via API
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
         const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-        // Get user's attendance records for this month
-        const userAttendance = await getUserAttendance(state.user!.id, startOfMonth, endOfMonth);
+        const response = await fetch(`/api/attendance/data?type=user&userId=${state.user!.id}&startDate=${startOfMonth.toISOString()}&endDate=${endOfMonth.toISOString()}`, {
+          headers: {
+            'Authorization': `Bearer ${state.token}`
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch attendance data');
+        }
+
+        const { data: userAttendance } = await response.json();
 
         // Calculate stats
         const total = userAttendance.length;
@@ -177,4 +192,4 @@ const UserDashboard = () => {
   );
 };
 
-export default withAuth(UserDashboard, { requiredRoles: [UserRole.USER] });
+export default UserDashboard;

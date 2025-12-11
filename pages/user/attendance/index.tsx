@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react';
-import { withAuth } from '@/utils/withAuth';
 import Layout from '@/components/layout/Layout';
-import { getUserAttendance } from '@/lib/attendance';
 import { UserRole } from '@/lib/auth';
 import { useAuth } from '@/context/AuthContext';
 
@@ -18,18 +16,34 @@ const UserAttendanceHistory = () => {
     const fetchAttendance = async () => {
       try {
         setLoading(true);
-        
-        // Convert string dates to Date objects
-        const start = new Date(dateRange.startDate);
-        start.setHours(0, 0, 0, 0);
-        
-        const end = new Date(dateRange.endDate);
-        end.setHours(23, 59, 59, 999);
 
-        const records = await getUserAttendance(state.user!.id, start, end);
-        setAttendanceRecords(records);
+        const token = localStorage.getItem('token'); // Get token from local storage
+        if (!token) {
+          throw new Error('No authentication token found');
+        }
+
+        // Make API request to fetch attendance records
+        const response = await fetch(`/api/attendance/user?userId=${state.user!.id}&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to fetch attendance records');
+        }
+
+        const data = await response.json();
+
+        if (data.success) {
+          setAttendanceRecords(data.data || []);
+        } else {
+          throw new Error(data.error || 'Failed to fetch attendance records');
+        }
       } catch (error) {
         console.error('Error fetching attendance:', error);
+        alert(error instanceof Error ? error.message : 'An error occurred while fetching attendance records');
       } finally {
         setLoading(false);
       }
@@ -104,9 +118,9 @@ const UserAttendanceHistory = () => {
                         {new Date(record.date).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                          ${record.status === 'PRESENT' ? 'bg-green-100 text-green-800' : 
-                            record.status === 'ABSENT' ? 'bg-red-100 text-red-800' : 
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                          ${record.status === 'PRESENT' ? 'bg-green-100 text-green-800' :
+                            record.status === 'ABSENT' ? 'bg-red-100 text-red-800' :
                             'bg-yellow-100 text-yellow-800'}`}
                         >
                           {record.status}
@@ -133,4 +147,4 @@ const UserAttendanceHistory = () => {
   );
 };
 
-export default withAuth(UserAttendanceHistory, { requiredRoles: [UserRole.USER] });
+export default UserAttendanceHistory;

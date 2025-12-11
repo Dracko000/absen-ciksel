@@ -1,14 +1,19 @@
-import { useState } from 'react';
-import { withAuth } from '@/utils/withAuth';
+import { useState, useEffect } from 'react';
 import Layout from '@/components/layout/Layout';
 import BarcodeScanner from '@/components/barcode/BarcodeScanner';
-import { validateUserFromBarcode } from '@/utils/barcode';
-import { logActivity } from '@/lib/activity';
 import { UserRole } from '@/lib/auth';
 import { useAuth } from '@/context/AuthContext';
 
 const TakeStudentAttendance = () => {
   const { state } = useAuth();
+
+  // Check authentication and role on the client-side
+  useEffect(() => {
+    if (state.user && state.user.role !== UserRole.ADMIN) {
+      // Redirect unauthorized users
+      window.location.href = '/unauthorized';
+    }
+  }, [state.user]);
   const [scannedUser, setScannedUser] = useState<any>(null);
   const [attendanceStatus, setAttendanceStatus] = useState<string>('PRESENT'); // PRESENT, ABSENT, LATE
   const [note, setNote] = useState<string>('');
@@ -18,7 +23,23 @@ const TakeStudentAttendance = () => {
   const handleScan = async (decodedText: string) => {
     try {
       setErrorMessage('');
-      const user = await validateUserFromBarcode(decodedText);
+
+      // Validate user via API call instead of direct function call
+      const response = await fetch('/api/validate-barcode', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${state.token}`
+        },
+        body: JSON.stringify({ barcodeData: decodedText })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Error validating user from barcode');
+      }
+
+      const { user } = await response.json();
 
       // Only allow scanning students if current user is an admin
       if (user.role !== 'USER') {
@@ -69,14 +90,23 @@ const TakeStudentAttendance = () => {
         throw new Error(errorData.message || 'Error recording attendance');
       }
 
-      // Log the attendance activity
-      await logActivity(
-        state.user.id,
-        'ATTENDANCE_TAKEN',
-        `Recorded ${attendanceStatus} attendance for student ${scannedUser.name}`,
-        '', // IP address
-        '' // User agent
-      );
+      // Log the attendance activity via API call instead of direct function call
+      try {
+        await fetch('/api/activity', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${state.token}`
+          },
+          body: JSON.stringify({
+            action: 'ATTENDANCE_TAKEN',
+            description: `Recorded ${attendanceStatus} attendance for student ${scannedUser.name}`,
+          })
+        });
+      } catch (error) {
+        console.error('Error logging activity:', error);
+        // We don't want to fail the attendance recording if activity logging fails
+      }
 
       setSuccessMessage(`Attendance recorded for ${scannedUser.name}`);
       setScannedUser(null);
@@ -176,4 +206,4 @@ const TakeStudentAttendance = () => {
   );
 };
 
-export default withAuth(TakeStudentAttendance, { requiredRoles: [UserRole.ADMIN] });
+export default TakeStudentAttendance;

@@ -1,12 +1,18 @@
 import { useState, useEffect } from 'react';
-import { withAuth } from '@/utils/withAuth';
 import Layout from '@/components/layout/Layout';
 import { UserRole } from '@/lib/auth';
-import { getAttendanceSummary, getAttendanceByType } from '@/lib/attendance';
 import { useAuth } from '@/context/AuthContext';
 
 const AdminDashboard = () => {
   const { state } = useAuth();
+
+  // Check authentication and role on the client-side
+  useEffect(() => {
+    if (state.user && state.user.role !== UserRole.ADMIN) {
+      // Redirect unauthorized users
+      window.location.href = '/unauthorized';
+    }
+  }, [state.user]);
   const [studentStats, setStudentStats] = useState<any>(null);
   const [recentAttendance, setRecentAttendance] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,13 +27,50 @@ const AdminDashboard = () => {
         const endOfDay = new Date(today);
         endOfDay.setHours(23, 59, 59, 999);
 
-        // Get student attendance stats for today
-        const studentStatsData = await getAttendanceSummary('MURID', startOfDay, endOfDay);
-        setStudentStats(studentStatsData);
+        const token = localStorage.getItem('token'); // Get token from local storage
+        if (!token) {
+          throw new Error('No authentication token found');
+        }
 
-        // Get recent attendance records
-        const recentAttendanceData = await getAttendanceByType('MURID', state.user!.id, startOfDay, endOfDay);
-        setRecentAttendance(recentAttendanceData.slice(0, 5)); // Show only first 5
+        // Get student attendance stats for today via API
+        const summaryResponse = await fetch(
+          `/api/attendance?operation=summary&attendanceType=MURID&startDate=${encodeURIComponent(startOfDay.toISOString())}&endDate=${encodeURIComponent(endOfDay.toISOString())}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (!summaryResponse.ok) {
+          const summaryError = await summaryResponse.json();
+          throw new Error(summaryError.error || 'Failed to fetch attendance summary');
+        }
+
+        const summaryData = await summaryResponse.json();
+        if (summaryData.success) {
+          setStudentStats(summaryData.data);
+        }
+
+        // Get recent attendance records via API
+        const attendanceResponse = await fetch(
+          `/api/attendance/by-type?attendanceType=MURID&recordedBy=${state.user!.id}&startDate=${encodeURIComponent(startOfDay.toISOString())}&endDate=${encodeURIComponent(endOfDay.toISOString())}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (!attendanceResponse.ok) {
+          const attendanceError = await attendanceResponse.json();
+          throw new Error(attendanceError.error || 'Failed to fetch attendance records');
+        }
+
+        const attendanceData = await attendanceResponse.json();
+        if (attendanceData.success) {
+          setRecentAttendance(attendanceData.data.slice(0, 5)); // Show only first 5
+        }
       } catch (error) {
         console.error('Error fetching dashboard stats:', error);
       } finally {
@@ -159,4 +202,4 @@ const AdminDashboard = () => {
   );
 };
 
-export default withAuth(AdminDashboard, { requiredRoles: [UserRole.ADMIN] });
+export default AdminDashboard;

@@ -1,11 +1,18 @@
 import { useState, useEffect } from 'react';
-import { withAuth } from '@/utils/withAuth';
 import Layout from '@/components/layout/Layout';
 import { UserRole } from '@/lib/auth';
 import { useAuth } from '@/context/AuthContext';
 
 const SuperAdminActivityLogPage = () => {
   const { state } = useAuth();
+
+  // Check if user has required role (superadmin)
+  useEffect(() => {
+    if (state.user && state.user.role !== UserRole.SUPERADMIN) {
+      // Redirect to unauthorized page or home
+      window.location.href = '/unauthorized';
+    }
+  }, [state.user]);
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>(null);
@@ -188,4 +195,4 @@ const SuperAdminActivityLogPage = () => {
   );
 };
 
-export default withAuth(SuperAdminActivityLogPage, { requiredRoles: [UserRole.SUPERADMIN] });
+export default SuperAdminActivityLogPage;

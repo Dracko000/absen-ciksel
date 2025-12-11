@@ -4,9 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "init-db": "tsx scripts/init-db.ts",
+    "seed-db": "tsx scripts/seed-db.ts",
+    "verify-db": "tsx scripts/verify-db.ts"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
@@ -27,7 +30,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/node": "^20.19.26",
     "@types/pg": "^8.16.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -35,6 +38,8 @@
     "eslint": "^9",
     "eslint-config-next": "16.0.8",
     "tailwindcss": "^4",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }

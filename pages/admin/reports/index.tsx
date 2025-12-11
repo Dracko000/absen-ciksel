@@ -1,13 +1,19 @@
-import { useState } from 'react';
-import { withAuth } from '@/utils/withAuth';
+import { useState, useEffect } from 'react';
 import Layout from '@/components/layout/Layout';
-import { getAttendanceSummary, getAttendanceByType } from '@/lib/attendance';
 import { exportAttendanceToExcel, exportStatsToExcel } from '@/lib/excel';
 import { UserRole } from '@/lib/auth';
 import { useAuth } from '@/context/AuthContext';
 
 const AdminReports = () => {
   const { state } = useAuth();
+
+  // Check authentication and role on the client-side
+  useEffect(() => {
+    if (state.user && state.user.role !== UserRole.ADMIN) {
+      // Redirect unauthorized users
+      window.location.href = '/unauthorized';
+    }
+  }, [state.user]);
   const [loading, setLoading] = useState(false);
   const [dateRange, setDateRange] = useState<{ startDate: string; endDate: string }>({
     startDate: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0], // 30 days ago
@@ -58,17 +64,58 @@ const AdminReports = () => {
         end.setHours(23, 59, 59, 999);
       }
       
-      // Fetch attendance records for students under this teacher
-      const studentRecords = await getAttendanceByType('MURID', state.user.id, start, end);
-      
+      const token = localStorage.getItem('token'); // Get token from local storage
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      // Fetch attendance records for students via API
+      const attendanceResponse = await fetch(
+        `/api/attendance/by-type?attendanceType=MURID&recordedBy=${state.user.id}&startDate=${encodeURIComponent(start.toISOString())}&endDate=${encodeURIComponent(end.toISOString())}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!attendanceResponse.ok) {
+        const attendanceError = await attendanceResponse.json();
+        throw new Error(attendanceError.error || 'Failed to fetch attendance records');
+      }
+
+      const attendanceData = await attendanceResponse.json();
+      if (!attendanceData.success) {
+        throw new Error(attendanceData.error || 'Failed to fetch attendance records');
+      }
+      const studentRecords = attendanceData.data || [];
+
       // Create date string for filename
       const dateStr = `${start.toISOString().split('T')[0]}_to_${end.toISOString().split('T')[0]}`;
-      
+
       // Export student attendance
       exportAttendanceToExcel(studentRecords, `Laporan_Kehadiran_Siswa_${type}_${dateStr}`, 'MURID');
-      
-      // Get and export student stats
-      const studentStats = await getAttendanceSummary('MURID', start, end);
+
+      // Get and export student stats via API
+      const summaryResponse = await fetch(
+        `/api/attendance?operation=summary&attendanceType=MURID&startDate=${encodeURIComponent(start.toISOString())}&endDate=${encodeURIComponent(end.toISOString())}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!summaryResponse.ok) {
+        const summaryError = await summaryResponse.json();
+        throw new Error(summaryError.error || 'Failed to fetch attendance stats');
+      }
+
+      const summaryData = await summaryResponse.json();
+      if (!summaryData.success) {
+        throw new Error(summaryData.error || 'Failed to fetch attendance stats');
+      }
+      const studentStats = summaryData.data;
       exportStatsToExcel(studentStats, `Statistik_Kehadiran_Siswa_${type}_${dateStr}`, 'Siswa');
       
       alert('Ekspor laporan berhasil!');
@@ -159,4 +206,4 @@ const AdminReports = () => {
   );
 };
 
-export default withAuth(AdminReports, { requiredRoles: [UserRole.ADMIN] });
+export default AdminReports;

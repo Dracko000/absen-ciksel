@@ -4,7 +4,11 @@ import { v4 as uuidv4 } from 'uuid';
 // Get attendance records for a specific user
 export const getUserAttendance = async (userId: string, startDate?: Date, endDate?: Date) => {
   const { Pool } = await import('pg');
-  const { DATABASE_URL } = await import('process');
+
+  const DATABASE_URL = process.env.DATABASE_URL || process.env.NEXT_PUBLIC_DATABASE_URL;
+  if (!DATABASE_URL) {
+    throw new Error('DATABASE_URL environment variable is not defined');
+  }
 
   const pool = new Pool({
     connectionString: DATABASE_URL,
@@ -44,7 +48,11 @@ export const getUserAttendance = async (userId: string, startDate?: Date, endDat
 // Get attendance records by type (teacher or student) for admin/superadmin
 export const getAttendanceByType = async (attendanceType: string, recordedBy?: string, startDate?: Date, endDate?: Date) => {
   const { Pool } = await import('pg');
-  const { DATABASE_URL } = await import('process');
+
+  const DATABASE_URL = process.env.DATABASE_URL || process.env.NEXT_PUBLIC_DATABASE_URL;
+  if (!DATABASE_URL) {
+    throw new Error('DATABASE_URL environment variable is not defined');
+  }
 
   const pool = new Pool({
     connectionString: DATABASE_URL,
@@ -90,7 +98,11 @@ export const getAttendanceByType = async (attendanceType: string, recordedBy?: s
 // Get attendance statistics
 export const getAttendanceStats = async (userId: string, attendanceType?: string, date?: Date) => {
   const { Pool } = await import('pg');
-  const { DATABASE_URL } = await import('process');
+
+  const DATABASE_URL = process.env.DATABASE_URL || process.env.NEXT_PUBLIC_DATABASE_URL;
+  if (!DATABASE_URL) {
+    throw new Error('DATABASE_URL environment variable is not defined');
+  }
 
   const pool = new Pool({
     connectionString: DATABASE_URL,
@@ -135,7 +147,11 @@ export const getAttendanceStats = async (userId: string, attendanceType?: string
 // Get attendance summary for dashboard
 export const getAttendanceSummary = async (attendanceType: string, startDate?: Date, endDate?: Date) => {
   const { Pool } = await import('pg');
-  const { DATABASE_URL } = await import('process');
+
+  const DATABASE_URL = process.env.DATABASE_URL || process.env.NEXT_PUBLIC_DATABASE_URL;
+  if (!DATABASE_URL) {
+    throw new Error('DATABASE_URL environment variable is not defined');
+  }
 
   const pool = new Pool({
     connectionString: DATABASE_URL,
@@ -219,7 +235,11 @@ export const getAttendanceSummary = async (attendanceType: string, startDate?: D
 // Get today's attendance for a user
 export const getTodaysAttendance = async (userId: string, attendanceType: string) => {
   const { Pool } = await import('pg');
-  const { DATABASE_URL } = await import('process');
+
+  const DATABASE_URL = process.env.DATABASE_URL || process.env.NEXT_PUBLIC_DATABASE_URL;
+  if (!DATABASE_URL) {
+    throw new Error('DATABASE_URL environment variable is not defined');
+  }
 
   const pool = new Pool({
     connectionString: DATABASE_URL,

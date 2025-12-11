@@ -1,13 +1,19 @@
 import { useState, useEffect } from 'react';
-import { withAuth } from '@/utils/withAuth';
 import Layout from '@/components/layout/Layout';
-import { getAttendanceByType } from '@/lib/attendance';
 import { exportAttendanceToExcel } from '@/lib/excel';
 import { UserRole } from '@/lib/auth';
 import { useAuth } from '@/context/AuthContext';
 
 const ViewTeacherAttendance = () => {
   const { state } = useAuth();
+
+  // Check authentication and role on the client-side
+  useEffect(() => {
+    if (state.user && state.user.role !== UserRole.SUPERADMIN) {
+      // Redirect unauthorized users
+      window.location.href = '/unauthorized';
+    }
+  }, [state.user]);
   const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<{ startDate: string; endDate: string }>({
@@ -27,8 +33,33 @@ const ViewTeacherAttendance = () => {
         const end = new Date(dateRange.endDate);
         end.setHours(23, 59, 59, 999);
 
-        const records = await getAttendanceByType('GURU', undefined, start, end); // Superadmin can view all teacher attendance
-        setAttendanceRecords(records);
+        const token = localStorage.getItem('token'); // Get token from local storage
+        if (!token) {
+          throw new Error('No authentication token found');
+        }
+
+        // Make API request to fetch attendance records
+        const response = await fetch(
+          `/api/attendance/by-type?attendanceType=GURU&startDate=${encodeURIComponent(start.toISOString())}&endDate=${encodeURIComponent(end.toISOString())}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to fetch attendance records');
+        }
+
+        const data = await response.json();
+
+        if (data.success) {
+          setAttendanceRecords(data.data || []);
+        } else {
+          throw new Error(data.error || 'Failed to fetch attendance records');
+        }
       } catch (error) {
         console.error('Error fetching attendance:', error);
       } finally {
@@ -163,4 +194,4 @@ const ViewTeacherAttendance = () => {
   );
 };
 
-export default withAuth(ViewTeacherAttendance, { requiredRoles: [UserRole.SUPERADMIN] });
+export default ViewTeacherAttendance;

@@ -10,7 +10,11 @@ export const logActivity = async (
   userAgent?: string
 ) => {
   const { Pool } = await import('pg');
-  const { DATABASE_URL } = await import('process');
+
+  const DATABASE_URL = process.env.DATABASE_URL || process.env.NEXT_PUBLIC_DATABASE_URL;
+  if (!DATABASE_URL) {
+    throw new Error('DATABASE_URL environment variable is not defined');
+  }
 
   const pool = new Pool({
     connectionString: DATABASE_URL,
@@ -48,7 +52,11 @@ export const getUserActivityLogs = async (
   offset: number = 0
 ) => {
   const { Pool } = await import('pg');
-  const { DATABASE_URL } = await import('process');
+
+  const DATABASE_URL = process.env.DATABASE_URL || process.env.NEXT_PUBLIC_DATABASE_URL;
+  if (!DATABASE_URL) {
+    throw new Error('DATABASE_URL environment variable is not defined');
+  }
 
   const pool = new Pool({
     connectionString: DATABASE_URL,
@@ -94,7 +102,11 @@ export const getAllActivityLogs = async (
   offset: number = 0
 ) => {
   const { Pool } = await import('pg');
-  const { DATABASE_URL } = await import('process');
+
+  const DATABASE_URL = process.env.DATABASE_URL || process.env.NEXT_PUBLIC_DATABASE_URL;
+  if (!DATABASE_URL) {
+    throw new Error('DATABASE_URL environment variable is not defined');
+  }
 
   const pool = new Pool({
     connectionString: DATABASE_URL,
@@ -136,7 +148,11 @@ export const getAllActivityLogs = async (
 // Get activity statistics
 export const getActivityStats = async (userId?: string) => {
   const { Pool } = await import('pg');
-  const { DATABASE_URL } = await import('process');
+
+  const DATABASE_URL = process.env.DATABASE_URL || process.env.NEXT_PUBLIC_DATABASE_URL;
+  if (!DATABASE_URL) {
+    throw new Error('DATABASE_URL environment variable is not defined');
+  }
 
   const pool = new Pool({
     connectionString: DATABASE_URL,

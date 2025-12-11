@@ -1,63 +1,107 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getUserFromToken } from '@/lib/auth';
-import { v4 as uuidv4 } from 'uuid';
+import { withAuth } from '@/utils/withAuth';
+import { 
+  getAttendanceStats, 
+  getAttendanceSummary,
+  getTodaysAttendance
+} from '@/lib/attendance';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ message: 'Method not allowed' });
+// Define types
+type AttendanceRecord = {
+  id: string;
+  userId: string;
+  date: Date;
+  status: 'PRESENT' | 'ABSENT' | 'LATE';
+  note?: string;
+  recordedBy: string;
+  attendanceType: string;
+  createdAt: Date;
+  updatedAt: Date;
+  name: string;
+};
+
+type ApiResponse = {
+  success: boolean;
+  data?: any;
+  error?: string;
+};
+
+const handler = async (req: NextApiRequest, res: NextApiResponse<ApiResponse>) => {
+  if (req.method !== 'GET') {
+    return res.status(405).json({ success: false, error: 'Method not allowed' });
   }
 
   try {
-    // Verify the user's token
-    const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    const { operation } = req.query;
 
-    if (!token) {
-      return res.status(401).json({ message: 'Access token is required' });
-    }
+    switch (operation) {
+      case 'stats': {
+        const { userId, attendanceType, date } = req.query;
+        
+        if (!userId) {
+          return res.status(400).json({ success: false, error: 'User ID is required' });
+        }
 
-    const user = await getUserFromToken(token);
+        let parsedDate: Date | undefined;
+        if (typeof date === 'string' && date) {
+          parsedDate = new Date(date);
+        }
 
-    const { userId, attendanceType, status, recordedBy, note } = req.body;
+        const stats = await getAttendanceStats(
+          userId as string,
+          typeof attendanceType === 'string' ? attendanceType : undefined,
+          parsedDate
+        );
 
-    if (!userId || !attendanceType || !status || !recordedBy) {
-      return res.status(400).json({ 
-        message: 'userId, attendanceType, status, and recordedBy are required' 
-      });
-    }
-
-    const { Pool } = await import('pg');
-    const { DATABASE_URL } = await import('process');
-    
-    const pool = new Pool({
-      connectionString: DATABASE_URL,
-      ssl: {
-        rejectUnauthorized: false // For NeonDB compatibility
+        return res.status(200).json({ success: true, data: stats });
       }
-    });
 
-    const client = await pool.connect();
-    
-    try {
-      // Insert attendance record
-      const result = await client.query(
-        `INSERT INTO attendance (id, userId, attendanceType, status, recordedBy, note, date) 
-         VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP) 
-         RETURNING *`,
-        [uuidv4(), userId, attendanceType, status, recordedBy, note || null]
-      );
+      case 'summary': {
+        const { attendanceType, startDate, endDate } = req.query;
 
-      res.status(200).json({
-        message: 'Attendance recorded successfully',
-        attendance: result.rows[0]
-      });
-    } finally {
-      client.release();
-      await pool.end(); // Close the pool connection
+        if (!attendanceType) {
+          return res.status(400).json({ success: false, error: 'Attendance type is required' });
+        }
+
+        let parsedStartDate: Date | undefined;
+        let parsedEndDate: Date | undefined;
+
+        if (typeof startDate === 'string' && startDate) {
+          parsedStartDate = new Date(startDate);
+        }
+
+        if (typeof endDate === 'string' && endDate) {
+          parsedEndDate = new Date(endDate);
+        }
+
+        const summary = await getAttendanceSummary(
+          attendanceType as string,
+          parsedStartDate,
+          parsedEndDate
+        );
+
+        return res.status(200).json({ success: true, data: summary });
+      }
+
+      case 'today': {
+        const { userId, attendanceType } = req.query;
+
+        if (!userId || !attendanceType) {
+          return res.status(400).json({ success: false, error: 'User ID and attendance type are required' });
+        }
+
+        const records = await getTodaysAttendance(userId as string, attendanceType as string);
+
+        return res.status(200).json({ success: true, data: records });
+      }
+
+      default:
+        return res.status(400).json({ success: false, error: 'Invalid operation' });
     }
   } catch (error: any) {
-    res.status(500).json({ 
-      message: error.message || 'Attendance recording failed' 
-    });
+    console.error('Error in attendance API:', error);
+    return res.status(500).json({ success: false, error: error.message || 'Internal server error' });
   }
-}
+};
+
+export default withAuth(handler);

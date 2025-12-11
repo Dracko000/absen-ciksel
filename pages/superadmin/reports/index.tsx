@@ -1,13 +1,19 @@
-import { useState } from 'react';
-import { withAuth } from '@/utils/withAuth';
+import { useState, useEffect } from 'react';
 import Layout from '@/components/layout/Layout';
-import { getAttendanceSummary, getAttendanceByType } from '@/lib/attendance';
 import { exportAttendanceToExcel, exportStatsToExcel } from '@/lib/excel';
 import { UserRole } from '@/lib/auth';
 import { useAuth } from '@/context/AuthContext';
 
 const SuperAdminReports = () => {
   const { state } = useAuth();
+
+  // Check authentication and role on the client-side
+  useEffect(() => {
+    if (state.user && state.user.role !== UserRole.SUPERADMIN) {
+      // Redirect unauthorized users
+      window.location.href = '/unauthorized';
+    }
+  }, [state.user]);
   const [loading, setLoading] = useState(false);
   const [dateRange, setDateRange] = useState<{ startDate: string; endDate: string }>({
     startDate: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0], // 30 days ago
@@ -53,25 +59,104 @@ const SuperAdminReports = () => {
         end.setHours(23, 59, 59, 999);
       }
       
-      // Fetch attendance records
-      const teacherRecords = await getAttendanceByType('GURU', undefined, start, end);
-      const studentRecords = await getAttendanceByType('MURID', undefined, start, end);
-      
+      const token = localStorage.getItem('token'); // Get token from local storage
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      // Fetch teacher attendance records via API
+      const teacherResponse = await fetch(
+        `/api/attendance/by-type?attendanceType=GURU&startDate=${encodeURIComponent(start.toISOString())}&endDate=${encodeURIComponent(end.toISOString())}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!teacherResponse.ok) {
+        const teacherError = await teacherResponse.json();
+        throw new Error(teacherError.error || 'Failed to fetch teacher attendance records');
+      }
+
+      const teacherData = await teacherResponse.json();
+      if (!teacherData.success) {
+        throw new Error(teacherData.error || 'Failed to fetch teacher attendance records');
+      }
+      const teacherRecords = teacherData.data || [];
+
+      // Fetch student attendance records via API
+      const studentResponse = await fetch(
+        `/api/attendance/by-type?attendanceType=MURID&startDate=${encodeURIComponent(start.toISOString())}&endDate=${encodeURIComponent(end.toISOString())}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!studentResponse.ok) {
+        const studentError = await studentResponse.json();
+        throw new Error(studentError.error || 'Failed to fetch student attendance records');
+      }
+
+      const studentData = await studentResponse.json();
+      if (!studentData.success) {
+        throw new Error(studentData.error || 'Failed to fetch student attendance records');
+      }
+      const studentRecords = studentData.data || [];
+
       // Create date string for filename
       const dateStr = `${start.toISOString().split('T')[0]}_to_${end.toISOString().split('T')[0]}`;
-      
+
       // Export teacher attendance
       exportAttendanceToExcel(teacherRecords, `Laporan_Kehadiran_Guru_${type}_${dateStr}`, 'GURU');
-      
+
       // Export student attendance
       exportAttendanceToExcel(studentRecords, `Laporan_Kehadiran_Siswa_${type}_${dateStr}`, 'MURID');
-      
-      // Get and export teacher stats
-      const teacherStats = await getAttendanceSummary('GURU', start, end);
+
+      // Get teacher stats via API
+      const teacherStatsResponse = await fetch(
+        `/api/attendance?operation=summary&attendanceType=GURU&startDate=${encodeURIComponent(start.toISOString())}&endDate=${encodeURIComponent(end.toISOString())}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!teacherStatsResponse.ok) {
+        const teacherStatsError = await teacherStatsResponse.json();
+        throw new Error(teacherStatsError.error || 'Failed to fetch teacher stats');
+      }
+
+      const teacherStatsData = await teacherStatsResponse.json();
+      if (!teacherStatsData.success) {
+        throw new Error(teacherStatsData.error || 'Failed to fetch teacher stats');
+      }
+      const teacherStats = teacherStatsData.data;
       exportStatsToExcel(teacherStats, `Statistik_Kehadiran_Guru_${type}_${dateStr}`, 'Guru');
-      
-      // Get and export student stats
-      const studentStats = await getAttendanceSummary('MURID', start, end);
+
+      // Get student stats via API
+      const studentStatsResponse = await fetch(
+        `/api/attendance?operation=summary&attendanceType=MURID&startDate=${encodeURIComponent(start.toISOString())}&endDate=${encodeURIComponent(end.toISOString())}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!studentStatsResponse.ok) {
+        const studentStatsError = await studentStatsResponse.json();
+        throw new Error(studentStatsError.error || 'Failed to fetch student stats');
+      }
+
+      const studentStatsData = await studentStatsResponse.json();
+      if (!studentStatsData.success) {
+        throw new Error(studentStatsData.error || 'Failed to fetch student stats');
+      }
+      const studentStats = studentStatsData.data;
       exportStatsToExcel(studentStats, `Statistik_Kehadiran_Siswa_${type}_${dateStr}`, 'Siswa');
       
       alert('Ekspor laporan berhasil!');
@@ -162,4 +247,4 @@ const SuperAdminReports = () => {
   );
 };
 
-export default withAuth(SuperAdminReports, { requiredRoles: [UserRole.SUPERADMIN] });
+export default SuperAdminReports;

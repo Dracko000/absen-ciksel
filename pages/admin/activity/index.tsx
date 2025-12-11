@@ -1,11 +1,18 @@
 import { useState, useEffect } from 'react';
-import { withAuth } from '@/utils/withAuth';
 import Layout from '@/components/layout/Layout';
 import { UserRole } from '@/lib/auth';
 import { useAuth } from '@/context/AuthContext';
 
 const ActivityLogPage = () => {
   const { state } = useAuth();
+
+  // Check if user has required roles (admin or superadmin)
+  useEffect(() => {
+    if (state.user && state.user.role !== UserRole.ADMIN && state.user.role !== UserRole.SUPERADMIN) {
+      // Redirect to unauthorized page or home
+      window.location.href = '/unauthorized';
+    }
+  }, [state.user]);
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>(null);
@@ -25,13 +32,18 @@ const ActivityLogPage = () => {
       // Format dates as strings for API request
       const startDateStr = start.toISOString();
       const endDateStr = end.toISOString();
-      
+
+      const token = localStorage.getItem('token'); // Get token from local storage
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
       const response = await fetch(
         `/api/activity?startDate=${startDateStr}&endDate=${endDateStr}&limit=50&offset=0`,
         {
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${state.token}`,
+            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
         }
@@ -182,4 +194,4 @@ const ActivityLogPage = () => {
   );
 };
 
-export default withAuth(ActivityLogPage, { requiredRoles: [UserRole.ADMIN, UserRole.SUPERADMIN] });
+export default ActivityLogPage;

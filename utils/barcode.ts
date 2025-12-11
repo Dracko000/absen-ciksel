@@ -39,7 +39,10 @@ export const validateUserFromBarcode = async (barcodeData: string) => {
 
   // Find user in database
   const { Pool } = await import('pg');
-  const { DATABASE_URL } = await import('process');
+  const DATABASE_URL = process.env.DATABASE_URL || process.env.NEXT_PUBLIC_DATABASE_URL;
+  if (!DATABASE_URL) {
+    throw new Error('DATABASE_URL environment variable is not defined');
+  }
 
   const pool = new Pool({
     connectionString: DATABASE_URL,
@@ -76,7 +79,10 @@ export const validateUserFromBarcode = async (barcodeData: string) => {
 // Validate user by ID (alternative to barcode)
 export const validateUserById = async (userId: string) => {
   const { Pool } = await import('pg');
-  const { DATABASE_URL } = await import('process');
+  const DATABASE_URL = process.env.DATABASE_URL || process.env.NEXT_PUBLIC_DATABASE_URL;
+  if (!DATABASE_URL) {
+    throw new Error('DATABASE_URL environment variable is not defined');
+  }
 
   const pool = new Pool({
     connectionString: DATABASE_URL,

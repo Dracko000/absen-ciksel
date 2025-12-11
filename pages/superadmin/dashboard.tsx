@@ -1,12 +1,18 @@
 import { useState, useEffect } from 'react';
-import { withAuth } from '@/utils/withAuth';
 import Layout from '@/components/layout/Layout';
 import { UserRole } from '@/lib/auth';
-import { getAttendanceSummary } from '@/lib/attendance';
 import { useAuth } from '@/context/AuthContext';
 
 const SuperAdminDashboard = () => {
   const { state } = useAuth();
+
+  // Check authentication and role on the client-side
+  useEffect(() => {
+    if (state.user && state.user.role !== UserRole.SUPERADMIN) {
+      // Redirect unauthorized users
+      window.location.href = '/unauthorized';
+    }
+  }, [state.user]);
   const [teacherStats, setTeacherStats] = useState<any>(null);
   const [studentStats, setStudentStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -21,13 +27,50 @@ const SuperAdminDashboard = () => {
         const endOfDay = new Date(today);
         endOfDay.setHours(23, 59, 59, 999);
 
-        // Get teacher attendance stats for today
-        const teacherStatsData = await getAttendanceSummary('GURU', startOfDay, endOfDay);
-        setTeacherStats(teacherStatsData);
+        const token = localStorage.getItem('token'); // Get token from local storage
+        if (!token) {
+          throw new Error('No authentication token found');
+        }
 
-        // Get student attendance stats for today
-        const studentStatsData = await getAttendanceSummary('MURID', startOfDay, endOfDay);
-        setStudentStats(studentStatsData);
+        // Get teacher attendance stats for today via API
+        const teacherResponse = await fetch(
+          `/api/attendance?operation=summary&attendanceType=GURU&startDate=${encodeURIComponent(startOfDay.toISOString())}&endDate=${encodeURIComponent(endOfDay.toISOString())}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (!teacherResponse.ok) {
+          const teacherError = await teacherResponse.json();
+          throw new Error(teacherError.error || 'Failed to fetch teacher attendance stats');
+        }
+
+        const teacherData = await teacherResponse.json();
+        if (teacherData.success) {
+          setTeacherStats(teacherData.data);
+        }
+
+        // Get student attendance stats for today via API
+        const studentResponse = await fetch(
+          `/api/attendance?operation=summary&attendanceType=MURID&startDate=${encodeURIComponent(startOfDay.toISOString())}&endDate=${encodeURIComponent(endOfDay.toISOString())}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (!studentResponse.ok) {
+          const studentError = await studentResponse.json();
+          throw new Error(studentError.error || 'Failed to fetch student attendance stats');
+        }
+
+        const studentData = await studentResponse.json();
+        if (studentData.success) {
+          setStudentStats(studentData.data);
+        }
       } catch (error) {
         console.error('Error fetching dashboard stats:', error);
       } finally {
@@ -174,4 +217,4 @@ const SuperAdminDashboard = () => {
   );
 };
 
-export default withAuth(SuperAdminDashboard, { requiredRoles: [UserRole.SUPERADMIN] });
+export default SuperAdminDashboard;

@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { withAuth } from '@/utils/withAuth';
 import Layout from '@/components/layout/Layout';
 import UserBarcode from '@/components/barcode/UserBarcode';
 import { useAuth } from '@/context/AuthContext';
@@ -7,6 +6,14 @@ import { UserRole } from '@/lib/auth';
 
 const UserProfile = () => {
   const { state } = useAuth();
+
+  // Check authentication and role on the client-side
+  useEffect(() => {
+    if (state.user && state.user.role !== UserRole.USER) {
+      // Redirect unauthorized users
+      window.location.href = '/unauthorized';
+    }
+  }, [state.user]);
   const [userData, setUserData] = useState<any>(null);
 
   useEffect(() => {
@@ -89,4 +96,4 @@ const UserProfile = () => {
   );
 };
 
-export default withAuth(UserProfile, { requiredRoles: [UserRole.USER] });
+export default UserProfile;
