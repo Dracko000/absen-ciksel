@@ -1,6 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getUserFromToken } from '@/lib/auth';
 
+export const runtime = 'nodejs'; // Use Node.js runtime as lib/auth imports bcryptjs, even if this endpoint doesn't directly use hashing functions
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });

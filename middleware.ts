@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyToken, UserRole } from '@/lib/jwt';
+import { verifyToken, UserRole } from '@/lib/jwt-edge'; // Use Edge-compatible version
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   // Public routes that don't require authentication
   const publicRoutes = [
     '/',
@@ -55,7 +55,7 @@ export function middleware(request: NextRequest) {
   // If a token exists, verify it
   if (token) {
     try {
-      const decoded = verifyToken(token);
+      const decoded = await verifyToken(token); // Await the verification
 
       // If route requires specific roles, check authorization
       if (requiredRoles && !requiredRoles.includes(decoded.role)) {

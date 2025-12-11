@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
-import { generateToken, verifyToken, hashPassword, comparePassword, UserRole } from './jwt';
+import { generateToken, verifyToken, UserRole } from './jwt-edge'; // Use Edge-compatible JWT functions
+import { hashPassword, comparePassword } from './jwt'; // Use Node.js-only hashing functions
 
 // Re-export functions so other modules can import them from auth
 export { UserRole, hashPassword, comparePassword, generateToken, verifyToken };
@@ -28,7 +29,7 @@ export const authenticateUser = async (email: string, password: string) => {
       throw new Error('Account is deactivated');
     }
 
-    const token = generateToken({
+    const token = await generateToken({ // Await this as it's now async
       id: user.id,
       email: user.email,
       role: user.role as UserRole
@@ -50,7 +51,7 @@ export const getUserFromToken = async (token?: string) => {
   }
 
   try {
-    const decoded = verifyToken(token);
+    const decoded = await verifyToken(token); // Await this as it's now async
 
     const { pool } = await import('./db');
 

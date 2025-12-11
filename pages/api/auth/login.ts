@@ -2,6 +2,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { authenticateUser, getUserFromToken } from '@/lib/auth';
 import { logActivity } from '@/lib/activity';
 
+export const runtime = 'nodejs'; // Use Node.js runtime due to bcryptjs usage in lib/auth via authenticateUser
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
