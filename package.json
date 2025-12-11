@@ -10,7 +10,9 @@
     "init-db": "tsx scripts/init-db.ts",
     "seed-db": "tsx scripts/seed-db.ts",
     "verify-db": "tsx scripts/verify-db.ts",
-    "generate-token": "node scripts/generate-token.js"
+    "generate-token": "node scripts/generate-token.js",
+    "build:pwa": "ANALYZE=false NODE_ENV=production next build --webpack",
+    "analyze": "ANALYZE=true NODE_ENV=production next build --webpack"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
@@ -22,6 +24,7 @@
     "html5-qrcode": "^2.3.8",
     "jsonwebtoken": "^9.0.3",
     "next": "16.0.8",
+    "next-pwa": "^5.6.0",
     "pg": "^8.16.3",
     "react": "19.2.1",
     "react-dom": "19.2.1",

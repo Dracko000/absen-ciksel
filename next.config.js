@@ -1,8 +1,15 @@
+// next.config.js
+const withPWA = require('next-pwa')({
+  dest: 'public',
+  disable: process.env.NODE_ENV === 'development', // Enable in production only
+  register: true,
+  skipWaiting: true,
+});
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   /* config options here */
   reactStrictMode: true,
-  // Comment out static export for now due to compatibility
   // output: 'export', // Export as a static application for PWA
   images: {
     unoptimized: false, // Enable image optimization
@@ -40,7 +47,7 @@ if (process.env.ANALYZE === 'true') {
   const withBundleAnalyzer = require('@next/bundle-analyzer')({
     enabled: process.env.ANALYZE === 'true',
   });
-  module.exports = withBundleAnalyzer(nextConfig);
+  module.exports = withBundleAnalyzer(withPWA(nextConfig));
 } else {
-  module.exports = nextConfig;
+  module.exports = withPWA(nextConfig);
 }
