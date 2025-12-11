@@ -9,41 +9,41 @@ export function middleware(request: NextRequest) {
     '/api/auth/register',
     '/api/auth/verify-token'  // This could be used to verify tokens
   ];
-  
+
   // Get the pathname
   const { pathname } = request.nextUrl;
-  
+
   // Allow access to public routes
   if (publicRoutes.includes(pathname)) {
     return NextResponse.next();
   }
-  
+
   // Check for authentication token in headers or cookies
   const token = request.headers.get('authorization')?.replace('Bearer ', '') ||
                 request.cookies.get('auth-token')?.value;
-  
+
   // Route-based authorization rules
   const roleRequirements: { [key: string]: UserRole[] } = {
     // Superadmin routes
     '/api/admin': [UserRole.SUPERADMIN],
     '/admin': [UserRole.SUPERADMIN],
-    
+
     // Admin routes (for teachers)
     '/api/guru': [UserRole.ADMIN],
     '/guru': [UserRole.ADMIN],
     '/api/teacher': [UserRole.ADMIN],
     '/teacher': [UserRole.ADMIN],
-    
+
     // User routes (for students)
     '/api/student': [UserRole.USER],
     '/student': [UserRole.USER],
     '/api/murid': [UserRole.USER],
     '/murid': [UserRole.USER],
   };
-  
+
   // Check if the current path requires specific roles
   let requiredRoles: UserRole[] | undefined;
-  
+
   // Find if path matches any role requirement patterns
   for (const [routePattern, roles] of Object.entries(roleRequirements)) {
     if (pathname.startsWith(routePattern)) {
@@ -51,17 +51,17 @@ export function middleware(request: NextRequest) {
       break;
     }
   }
-  
+
   // If a token exists, verify it
   if (token) {
     try {
       const decoded = verifyToken(token);
-      
+
       // If route requires specific roles, check authorization
       if (requiredRoles && !requiredRoles.includes(decoded.role)) {
         return NextResponse.redirect(new URL('/api/auth/unauthorized', request.url));
       }
-      
+
       // Token is valid and authorized, proceed
       return NextResponse.next();
     } catch (error) {

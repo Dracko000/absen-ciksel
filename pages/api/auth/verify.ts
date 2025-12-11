@@ -7,31 +7,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
+    // Get token from Authorization header
     const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    const token = authHeader && authHeader.startsWith('Bearer ') 
+      ? authHeader.substring(7) 
+      : undefined;
 
     if (!token) {
-      return res.status(401).json({ message: 'Access token is required' });
+      return res.status(401).json({ 
+        authenticated: false, 
+        message: 'No token provided' 
+      });
     }
 
+    // Verify the token and get user
     const user = await getUserFromToken(token);
-    
+
     res.status(200).json({
       authenticated: true,
-      user: {
-        id: user.id,
-        userId: user.userId,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        classId: user.classId,
-        subject: user.subject
-      }
+      user
     });
   } catch (error: any) {
-    res.status(401).json({ 
+    res.status(401).json({
       authenticated: false,
-      message: error.message || 'Token verification failed' 
+      message: error.message || 'Invalid token'
     });
   }
 }

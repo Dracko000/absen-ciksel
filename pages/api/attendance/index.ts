@@ -1,138 +1,123 @@
+// pages/api/attendance/index.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { withAuth } from '@/utils/withAuth';
-import {
-  getAttendanceStats,
-  getAttendanceSummary,
-  getTodaysAttendance
-} from '@/lib/attendance';
-import { cache } from '@/lib/cache';
+import { getUserFromToken } from '@/lib/auth';
+import { pool } from '@/lib/db';
 
-// Define types
-type AttendanceRecord = {
-  id: string;
-  userId: string;
-  date: Date;
-  status: 'PRESENT' | 'ABSENT' | 'LATE';
-  note?: string;
-  recordedBy: string;
-  attendanceType: string;
-  createdAt: Date;
-  updatedAt: Date;
-  name: string;
-};
-
-type ApiResponse = {
-  success: boolean;
-  data?: any;
-  error?: string;
-};
-
-const handler = async (req: NextApiRequest, res: NextApiResponse<ApiResponse>) => {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ success: false, error: 'Method not allowed' });
-  }
-
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const { operation } = req.query;
+    // Verify the token
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.startsWith('Bearer ') 
+      ? authHeader.substring(7) 
+      : undefined;
 
-    switch (operation) {
-      case 'stats': {
-        const { userId, attendanceType, date } = req.query;
+    const user = await getUserFromToken(token);
 
-        if (!userId) {
-          return res.status(400).json({ success: false, error: 'User ID is required' });
-        }
+    if (req.method === 'GET') {
+      // Get attendance records for a specific date
+      const { date } = req.query;
 
-        // Create cache key
-        const cacheKey = `attendance_stats_${userId}_${attendanceType}_${date}`;
-        const cachedResult = cache.get(cacheKey);
-        if (cachedResult) {
-          return res.status(200).json({ success: true, data: cachedResult });
-        }
+      if (!date) {
+        return res.status(400).json({ 
+          message: 'Date parameter is required' 
+        });
+      }
 
-        let parsedDate: Date | undefined;
-        if (typeof date === 'string' && date) {
-          parsedDate = new Date(date);
-        }
+      const client = await pool.connect();
 
-        const stats = await getAttendanceStats(
-          userId as string,
-          typeof attendanceType === 'string' ? attendanceType : undefined,
-          parsedDate
+      try {
+        // Query to get attendance records for the specified date
+        const result = await client.query(
+          `SELECT a.*, u.name as student_name, u.userId as student_id 
+           FROM attendance a
+           JOIN users u ON a.userId = u.id
+           WHERE DATE(a.date) = $1
+           ORDER BY u.name`,
+          [date]
         );
 
-        // Cache for 10 minutes
-        cache.set(cacheKey, stats, 600000);
-
-        return res.status(200).json({ success: true, data: stats });
+        res.status(200).json({ attendance: result.rows });
+      } finally {
+        client.release();
+      }
+    } else if (req.method === 'POST') {
+      // Record attendance (only ADMIN or SUPERADMIN can do this)
+      if (user.role !== 'ADMIN' && user.role !== 'SUPERADMIN') {
+        return res.status(403).json({ 
+          message: 'Access denied. ADMIN or SUPERADMIN role required.' 
+        });
       }
 
-      case 'summary': {
-        const { attendanceType, startDate, endDate } = req.query;
+      const { attendanceData, recordedBy } = req.body;
 
-        if (!attendanceType) {
-          return res.status(400).json({ success: false, error: 'Attendance type is required' });
-        }
-
-        // Create cache key
-        const cacheKey = `attendance_summary_${attendanceType}_${startDate}_${endDate}`;
-        const cachedResult = cache.get(cacheKey);
-        if (cachedResult) {
-          return res.status(200).json({ success: true, data: cachedResult });
-        }
-
-        let parsedStartDate: Date | undefined;
-        let parsedEndDate: Date | undefined;
-
-        if (typeof startDate === 'string' && startDate) {
-          parsedStartDate = new Date(startDate);
-        }
-
-        if (typeof endDate === 'string' && endDate) {
-          parsedEndDate = new Date(endDate);
-        }
-
-        const summary = await getAttendanceSummary(
-          attendanceType as string,
-          parsedStartDate,
-          parsedEndDate
-        );
-
-        // Cache for 5 minutes
-        cache.set(cacheKey, summary, 300000);
-
-        return res.status(200).json({ success: true, data: summary });
+      if (!Array.isArray(attendanceData) || !recordedBy) {
+        return res.status(400).json({ 
+          message: 'attendanceData array and recordedBy are required' 
+        });
       }
 
-      case 'today': {
-        const { userId, attendanceType } = req.query;
+      const client = await pool.connect();
 
-        if (!userId || !attendanceType) {
-          return res.status(400).json({ success: false, error: 'User ID and attendance type are required' });
+      try {
+        // Use a transaction to ensure all attendance records are saved together
+        await client.query('BEGIN');
+
+        for (const record of attendanceData) {
+          const { userId, date, status, attendanceType, note } = record;
+
+          // Validate required fields
+          if (!userId || !date || !status) {
+            throw new Error(`Missing required fields for user ${userId}`);
+          }
+
+          // Validate status
+          if (!['PRESENT', 'ABSENT', 'LATE'].includes(status)) {
+            throw new Error(`Invalid status for user ${userId}: ${status}`);
+          }
+
+          // Check if attendance already exists for this user and date
+          const existingRecord = await client.query(
+            'SELECT id FROM attendance WHERE userId = $1 AND DATE(date) = $2',
+            [userId, date]
+          );
+
+          if (existingRecord.rows.length > 0) {
+            // Update existing record
+            await client.query(
+              `UPDATE attendance 
+               SET status = $1, note = $2, recordedBy = $3, attendanceType = $4, updatedAt = CURRENT_TIMESTAMP
+               WHERE userId = $5 AND DATE(date) = $6`,
+              [status, note || null, recordedBy, attendanceType || 'DAILY', userId, date]
+            );
+          } else {
+            // Insert new record
+            await client.query(
+              `INSERT INTO attendance (userId, date, status, note, recordedBy, attendanceType)
+               VALUES ($1, $2, $3, $4, $5, $6)`,
+              [userId, date, status, note || null, recordedBy, attendanceType || 'DAILY']
+            );
+          }
         }
 
-        // Create cache key
-        const cacheKey = `attendance_today_${userId}_${attendanceType}`;
-        const cachedResult = cache.get(cacheKey);
-        if (cachedResult) {
-          return res.status(200).json({ success: true, data: cachedResult });
-        }
+        await client.query('COMMIT');
 
-        const records = await getTodaysAttendance(userId as string, attendanceType as string);
-
-        // Cache for 1 hour (3,600,000 ms) since today's attendance doesn't change frequently
-        cache.set(cacheKey, records, 3600000);
-
-        return res.status(200).json({ success: true, data: records });
+        res.status(200).json({ message: 'Attendance records saved successfully' });
+      } catch (error: any) {
+        await client.query('ROLLBACK');
+        console.error('Error saving attendance:', error);
+        res.status(500).json({ 
+          message: error.message || 'Internal server error' 
+        });
+      } finally {
+        client.release();
       }
-
-      default:
-        return res.status(400).json({ success: false, error: 'Invalid operation' });
+    } else {
+      res.status(405).json({ message: 'Method not allowed' });
     }
   } catch (error: any) {
     console.error('Error in attendance API:', error);
-    return res.status(500).json({ success: false, error: error.message || 'Internal server error' });
+    res.status(500).json({ 
+      message: error.message || 'Internal server error' 
+    });
   }
-};
-
-export default withAuth(handler);
+}

@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { createUser, UserRole } from '@/lib/auth';
+import { createUser, UserRole, checkUserExists } from '@/lib/auth';
 import { logActivity } from '@/lib/activity';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -10,64 +10,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const { userId, name, email, password, role, classId, subject } = req.body;
 
+    // Validate required fields
     if (!userId || !name || !email || !password || !role) {
-      return res.status(400).json({
-        message: 'userId, name, email, password, and role are required'
+      return res.status(400).json({ 
+        message: 'userId, name, email, password, and role are required' 
       });
     }
 
-    // Check if user with email already exists
-    const { Pool } = await import('pg');
-    const DATABASE_URL = process.env.DATABASE_URL || process.env.NEXT_PUBLIC_DATABASE_URL;
-    if (!DATABASE_URL) {
-      throw new Error('DATABASE_URL environment variable is not defined');
+    // Check if user already exists
+    const exists = await checkUserExists(email);
+    if (exists) {
+      return res.status(400).json({ 
+        message: 'User with this email already exists' 
+      });
     }
 
-    const pool = new Pool({
-      connectionString: DATABASE_URL,
-      ssl: {
-        rejectUnauthorized: false // For NeonDB compatibility
-      }
-    });
+    // Create the user
+    const user = await createUser(userId, name, email, password, role as UserRole, classId, subject);
 
-    const client = await pool.connect();
-    try {
-      const result = await client.query('SELECT * FROM users WHERE email = $1', [email]);
-      if (result.rows.length > 0) {
-        return res.status(409).json({ message: 'User with this email already exists' });
-      }
-    } finally {
-      client.release();
-      await pool.end(); // Close the pool connection
-    }
-
-    // Only superadmin can create other superadmins and admins
-    // Regular users can only register as USER role
-    // For this implementation, we'll allow basic registration with validation
-
-    const userRole = role as UserRole;
-    if (!Object.values(UserRole).includes(userRole)) {
-      return res.status(400).json({ message: 'Invalid role specified' });
-    }
-
-    const newUser = await createUser(userId, name, email, password, userRole, classId, subject);
-
-    // Log user creation activity
+    // Log registration activity
     await logActivity(
-      newUser.id,
-      'USER_CREATED',
-      `New user ${newUser.name} was registered`,
+      user.id,
+      'USER_REGISTERED',
+      `${user.name} registered with role ${user.role}`,
       req.headers['x-forwarded-for'] as string || req.connection.remoteAddress || '',
       req.headers['user-agent'] || ''
     );
 
-    // The password is already removed in createUser
     res.status(201).json({
       message: 'User created successfully',
-      user: newUser
+      user
     });
   } catch (error: any) {
-    res.status(500).json({
+    res.status(400).json({
       message: error.message || 'Registration failed'
     });
   }
