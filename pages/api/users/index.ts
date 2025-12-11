@@ -21,12 +21,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'GET') {
-      // Get all users
+      // Get all users with pagination
+      const { page = 1, limit = 10 } = req.query;
+      const offset = (Number(page) - 1) * Number(limit);
+
       const client = await pool.connect();
 
       try {
+        // Count total users for pagination metadata
+        const countResult = await client.query(
+          'SELECT COUNT(*) FROM users'
+        );
+        const total = parseInt(countResult.rows[0].count, 10);
+
+        // Select only required fields to reduce payload
         const result = await client.query(
-          'SELECT id, userId, name, email, role, classId, subject, isActive, createdAt FROM users ORDER BY createdAt DESC'
+          `SELECT id, userId, name, email, role, classId, subject, isActive, createdAt
+           FROM users
+           ORDER BY createdAt DESC
+           LIMIT $1 OFFSET $2`,
+          [Number(limit), offset]
         );
 
         // Remove sensitive information before sending
@@ -42,7 +56,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           createdAt: user.createdAt
         }));
 
-        res.status(200).json({ users });
+        res.status(200).json({
+          users,
+          pagination: {
+            current: Number(page),
+            pages: Math.ceil(total / Number(limit)),
+            total,
+            limit: Number(limit)
+          }
+        });
       } finally {
         client.release();
       }

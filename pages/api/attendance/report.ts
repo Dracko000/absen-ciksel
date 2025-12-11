@@ -33,8 +33,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       try {
         // Build the query based on user role and optional classId
+        // Select only required fields to reduce payload
         let query = `
-          SELECT a.*, u.name as student_name, u.userId as student_id 
+          SELECT a.userId, a.date, a.status, a.note, a.attendanceType, u.name as student_name, u.userId as student_id
           FROM attendance a
           JOIN users u ON a.userId = u.id
           WHERE a.date >= $1 AND a.date <= $2

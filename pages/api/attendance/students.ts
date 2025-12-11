@@ -21,27 +21,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'GET') {
-      const { classId } = req.query;
+      const { classId, page = 1, limit = 10 } = req.query;
 
       if (!classId) {
-        return res.status(400).json({ 
-          message: 'classId parameter is required' 
+        return res.status(400).json({
+          message: 'classId parameter is required'
         });
       }
+
+      const offset = (Number(page) - 1) * Number(limit);
 
       const client = await pool.connect();
 
       try {
-        // Query to get students in the specified class
+        // Count total students for pagination metadata
+        const countResult = await client.query(
+          'SELECT COUNT(*) FROM users WHERE role = $1 AND classId = $2',
+          ['USER', classId]
+        );
+        const total = parseInt(countResult.rows[0].count, 10);
+
+        // Query to get students in the specified class with pagination
+        // Only select the fields required by the attendance page to reduce payload
         const result = await client.query(
-          `SELECT id, userId, name, email, classId, subject, isActive, createdAt
+          `SELECT id, userId, name
            FROM users
-           WHERE role = 'USER' AND classId = $1
-           ORDER BY name`,
-          [classId]
+           WHERE role = $1 AND classId = $2
+           ORDER BY name
+           LIMIT $3 OFFSET $4`,
+          ['USER', classId, Number(limit), offset]
         );
 
-        res.status(200).json({ students: result.rows });
+        res.status(200).json({
+          students: result.rows,
+          pagination: {
+            current: Number(page),
+            pages: Math.ceil(total / Number(limit)),
+            total,
+            limit: Number(limit)
+          }
+        });
       } finally {
         client.release();
       }

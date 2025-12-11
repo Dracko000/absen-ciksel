@@ -15,28 +15,50 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === 'GET') {
       // Get attendance records for a specific date
-      const { date } = req.query;
+      const { date, page = 1, limit = 10 } = req.query;
 
       if (!date) {
-        return res.status(400).json({ 
-          message: 'Date parameter is required' 
+        return res.status(400).json({
+          message: 'Date parameter is required'
         });
       }
+
+      const offset = (Number(page) - 1) * Number(limit);
 
       const client = await pool.connect();
 
       try {
-        // Query to get attendance records for the specified date
+        // Count total attendance records for the specified date for pagination metadata
+        const countResult = await client.query(
+          `SELECT COUNT(*)
+           FROM attendance a
+           JOIN users u ON a.userId = u.id
+           WHERE DATE(a.date) = $1`,
+          [date]
+        );
+        const total = parseInt(countResult.rows[0].count, 10);
+
+        // Query to get attendance records for the specified date with pagination
+        // Select only required fields to reduce payload
         const result = await client.query(
-          `SELECT a.*, u.name as student_name, u.userId as student_id 
+          `SELECT a.userId, a.status, a.date, u.name as student_name
            FROM attendance a
            JOIN users u ON a.userId = u.id
            WHERE DATE(a.date) = $1
-           ORDER BY u.name`,
-          [date]
+           ORDER BY u.name
+           LIMIT $2 OFFSET $3`,
+          [date, Number(limit), offset]
         );
 
-        res.status(200).json({ attendance: result.rows });
+        res.status(200).json({
+          attendance: result.rows,
+          pagination: {
+            current: Number(page),
+            pages: Math.ceil(total / Number(limit)),
+            total,
+            limit: Number(limit)
+          }
+        });
       } finally {
         client.release();
       }

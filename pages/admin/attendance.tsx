@@ -11,8 +11,21 @@ const AttendancePage: React.FC = () => {
   const [students, setStudents] = useState<any[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  // Loading state: true only during initial load of students list
   const [loading, setLoading] = useState(true);
+  // Specific loading state for attendance fetching (when date changes or attendance is viewed)
+  const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [attendanceStatus, setAttendanceStatus] = useState<{[key: string]: string}>({});
+
+  // Pagination state for students
+  const [currentPageStudents, setCurrentPageStudents] = useState<number>(1);
+  const [limitStudents] = useState<number>(10); // Keep limit fixed for now
+  const [studentPaginationMeta, setStudentPaginationMeta] = useState<{current: number, pages: number, total: number, limit: number} | null>(null);
+
+  // Pagination state for attendance records (when viewing)
+  const [currentPageAttendance, setCurrentPageAttendance] = useState<number>(1);
+  const [limitAttendance] = useState<number>(10); // Keep limit fixed for now
+  const [attendancePaginationMeta, setAttendancePaginationMeta] = useState<{current: number, pages: number, total: number, limit: number} | null>(null);
 
   // Check if user has ADMIN role
   if (state.user?.role !== UserRole.ADMIN) {
@@ -29,8 +42,9 @@ const AttendancePage: React.FC = () => {
   // Fetch students in the admin's class
   useEffect(() => {
     const fetchStudents = async () => {
+      setLoading(true); // Set loading true at the start of fetching students
       try {
-        const response = await fetch(`/api/attendance/students?classId=${state.user?.classId}`, {
+        const response = await fetch(`/api/attendance/students?classId=${state.user?.classId}&page=${currentPageStudents}&limit=${limitStudents}`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('auth-token')}`
           }
@@ -44,26 +58,29 @@ const AttendancePage: React.FC = () => {
             initialStatus[student.id] = 'PRESENT'; // Default to present
           });
           setAttendanceStatus(initialStatus);
+          // Update pagination metadata
+          setStudentPaginationMeta(data.pagination);
         } else {
           console.error('Error fetching students:', data.message);
         }
       } catch (error) {
         console.error('Error fetching students:', error);
       } finally {
-        setLoading(false);
+        setLoading(false); // Set loading false after fetching students is done
       }
     };
 
     if (state.user?.classId) {
       fetchStudents();
     }
-  }, [state.user]);
+  }, [state.user, currentPageStudents]); // Add currentPageStudents to dependency array
 
   // Fetch attendance records
   useEffect(() => {
     const fetchAttendanceRecords = async () => {
+      setLoadingAttendance(true); // Set specific loading state for attendance
       try {
-        const response = await fetch(`/api/attendance?date=${selectedDate}`, {
+        const response = await fetch(`/api/attendance?date=${selectedDate}&page=${currentPageAttendance}&limit=${limitAttendance}`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('auth-token')}`
           }
@@ -71,18 +88,22 @@ const AttendancePage: React.FC = () => {
         const data = await response.json();
         if (response.ok) {
           setAttendanceRecords(data.attendance || []);
+          // Update pagination metadata for attendance
+          setAttendancePaginationMeta(data.pagination);
         } else {
           console.error('Error fetching attendance:', data.message);
         }
       } catch (error) {
         console.error('Error fetching attendance:', error);
+      } finally {
+        setLoadingAttendance(false); // Reset specific loading state for attendance
       }
     };
 
     if (selectedDate) {
       fetchAttendanceRecords();
     }
-  }, [selectedDate]);
+  }, [selectedDate, currentPageAttendance]); // Add currentPageAttendance to dependency array
 
   const handleStatusChange = (studentId: string, status: string) => {
     setAttendanceStatus(prev => ({
@@ -91,9 +112,15 @@ const AttendancePage: React.FC = () => {
     }));
   };
 
+  const handlePageChangeStudents = (newPage: number) => {
+    if (newPage >= 1 && newPage <= (studentPaginationMeta?.pages || 1)) {
+        setCurrentPageStudents(newPage);
+    }
+  };
+
   const handleSaveAttendance = async () => {
-    setLoading(true);
-    
+    setLoadingAttendance(true); // Use attendance loading state for save operation
+
     try {
       // Prepare attendance data
       const attendanceData = students.map(student => ({
@@ -120,6 +147,8 @@ const AttendancePage: React.FC = () => {
 
       if (response.ok) {
         alert('Data kehadiran berhasil disimpan');
+        // Optionally refetch attendance records for the current date/page after saving
+        // fetchAttendanceRecords(); // You might need to call this explicitly or trigger the useEffect
       } else {
         alert(result.message || 'Gagal menyimpan data kehadiran');
       }
@@ -127,7 +156,7 @@ const AttendancePage: React.FC = () => {
       console.error('Error saving attendance:', error);
       alert('Gagal menyimpan data kehadiran');
     } finally {
-      setLoading(false);
+      setLoadingAttendance(false);
     }
   };
 
@@ -161,12 +190,12 @@ const AttendancePage: React.FC = () => {
             />
           </div>
           <div>
-            <Button 
-              onClick={handleSaveAttendance} 
+            <Button
+              onClick={handleSaveAttendance}
               variant="success"
-              disabled={loading}
+              disabled={loadingAttendance}
             >
-              {loading ? 'Menyimpan...' : 'Simpan Kehadiran'}
+              {loadingAttendance ? 'Menyimpan...' : 'Simpan Kehadiran'}
             </Button>
           </div>
         </div>
@@ -217,6 +246,33 @@ const AttendancePage: React.FC = () => {
         {students.length === 0 && (
           <div className="text-center py-8">
             <p className="text-gray-500">Belum ada data siswa dalam kelas ini.</p>
+          </div>
+        )}
+        {/* Pagination Controls for Students */}
+        {studentPaginationMeta && studentPaginationMeta.pages > 1 && (
+          <div className="px-6 py-3 border-t border-gray-200 flex items-center justify-between bg-gray-50">
+            <div className="text-sm text-gray-700">
+              Menampilkan {((studentPaginationMeta.current - 1) * studentPaginationMeta.limit) + 1} - {Math.min(studentPaginationMeta.current * studentPaginationMeta.limit, studentPaginationMeta.total)} dari {studentPaginationMeta.total} siswa
+            </div>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => handlePageChangeStudents(studentPaginationMeta.current - 1)}
+                disabled={studentPaginationMeta.current === 1}
+                className={`px-3 py-1 rounded-md ${studentPaginationMeta.current === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+              >
+                Sebelumnya
+              </button>
+              <span className="px-3 py-1 bg-gray-200 text-gray-700 rounded-md">
+                {studentPaginationMeta.current} dari {studentPaginationMeta.pages}
+              </span>
+              <button
+                onClick={() => handlePageChangeStudents(studentPaginationMeta.current + 1)}
+                disabled={studentPaginationMeta.current === studentPaginationMeta.pages}
+                className={`px-3 py-1 rounded-md ${studentPaginationMeta.current === studentPaginationMeta.pages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+              >
+                Berikutnya
+              </button>
+            </div>
           </div>
         )}
       </div>

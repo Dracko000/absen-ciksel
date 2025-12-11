@@ -9,8 +9,16 @@ import Input from '@/components/ui/Input';
 const UsersManagement: React.FC = () => {
   const { state } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
+  // Loading state for initial fetch or when adding/deleting (affects main user list display)
   const [loading, setLoading] = useState(true);
+  // Specific loading state for fetching users via pagination
+  const [loadingUsers, setLoadingUsers] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [limit] = useState<number>(10); // Keep limit fixed for now
+  const [paginationMeta, setPaginationMeta] = useState<{current: number, pages: number, total: number, limit: number} | null>(null);
   const [newUser, setNewUser] = useState({
     userId: '',
     name: '',
@@ -36,8 +44,9 @@ const UsersManagement: React.FC = () => {
   // Fetch users from API
   useEffect(() => {
     const fetchUsers = async () => {
+      setLoadingUsers(true); // Use specific loading state for fetching users
       try {
-        const response = await fetch('/api/users', {
+        const response = await fetch(`/api/users?page=${currentPage}&limit=${limit}`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('auth-token')}`
           }
@@ -45,18 +54,21 @@ const UsersManagement: React.FC = () => {
         const data = await response.json();
         if (response.ok) {
           setUsers(data.users || []);
+          // Update pagination metadata
+          setPaginationMeta(data.pagination);
         } else {
           console.error('Error fetching users:', data.message);
         }
       } catch (error) {
         console.error('Error fetching users:', error);
       } finally {
-        setLoading(false);
+        setLoading(false); // Still set global loading false after initial load
+        setLoadingUsers(false); // And reset specific loading state
       }
     };
 
     fetchUsers();
-  }, []);
+  }, [currentPage]); // Add currentPage to dependency array
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,8 +87,7 @@ const UsersManagement: React.FC = () => {
       const result = await response.json();
 
       if (response.ok) {
-        // Add the new user to the list
-        setUsers([...users, result.user]);
+        // Reset form and hide it
         setNewUser({
           userId: '',
           name: '',
@@ -87,6 +98,21 @@ const UsersManagement: React.FC = () => {
           subject: ''
         });
         setShowAddForm(false);
+        // Refetch users to include the new one, keeping the current page
+        // This will reload the current page of users
+        const response = await fetch(`/api/users?page=${currentPage}&limit=${limit}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('auth-token')}`
+          }
+        });
+        const data = await response.json();
+        if (response.ok) {
+          setUsers(data.users || []);
+          // Update pagination metadata in case total count changed
+          setPaginationMeta(data.pagination);
+        } else {
+          console.error('Error refetching users after add:', data.message);
+        }
       } else {
         alert(result.message || 'Gagal menambahkan pengguna');
       }
@@ -110,7 +136,26 @@ const UsersManagement: React.FC = () => {
       });
 
       if (response.ok) {
-        setUsers(users.filter(user => user.id !== userId));
+        // Refetch users to reflect the deletion, keeping the current page
+        // This handles cases like deleting the last user on the last page
+        const response = await fetch(`/api/users?page=${currentPage}&limit=${limit}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('auth-token')}`
+          }
+        });
+        const data = await response.json();
+        if (response.ok) {
+          setUsers(data.users || []);
+          // Update pagination metadata in case total count changed
+          setPaginationMeta(data.pagination);
+          // If the current page is now empty and it's not the first page,
+          // consider navigating to the previous page
+          if (data.users.length === 0 && currentPage > 1) {
+            setCurrentPage(prev => prev - 1);
+          }
+        } else {
+          console.error('Error refetching users after delete:', data.message);
+        }
       } else {
         const result = await response.json();
         alert(result.message || 'Gagal menghapus pengguna');
@@ -121,7 +166,13 @@ const UsersManagement: React.FC = () => {
     }
   };
 
-  if (loading && users.length === 0) {
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= (paginationMeta?.pages || 1)) {
+        setCurrentPage(newPage);
+    }
+  };
+
+  if (loading) {
     return (
       <DashboardLayout title="Manajemen Pengguna">
         <div className="flex justify-center items-center h-64">
@@ -261,9 +312,36 @@ const UsersManagement: React.FC = () => {
             ))}
           </tbody>
         </table>
-        {users.length === 0 && (
+        {users.length === 0 && !loadingUsers && (
           <div className="text-center py-8">
             <p className="text-gray-500">Belum ada data pengguna.</p>
+          </div>
+        )}
+        {/* Pagination Controls */}
+        {!loadingUsers && paginationMeta && paginationMeta.pages > 1 && (
+          <div className="px-6 py-3 border-t border-gray-200 flex items-center justify-between bg-gray-50">
+            <div className="text-sm text-gray-700">
+              Menampilkan {((paginationMeta.current - 1) * paginationMeta.limit) + 1} - {Math.min(paginationMeta.current * paginationMeta.limit, paginationMeta.total)} dari {paginationMeta.total} pengguna
+            </div>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => handlePageChange(paginationMeta.current - 1)}
+                disabled={paginationMeta.current === 1}
+                className={`px-3 py-1 rounded-md ${paginationMeta.current === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+              >
+                Sebelumnya
+              </button>
+              <span className="px-3 py-1 bg-gray-200 text-gray-700 rounded-md">
+                {paginationMeta.current} dari {paginationMeta.pages}
+              </span>
+              <button
+                onClick={() => handlePageChange(paginationMeta.current + 1)}
+                disabled={paginationMeta.current === paginationMeta.pages}
+                className={`px-3 py-1 rounded-md ${paginationMeta.current === paginationMeta.pages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+              >
+                Berikutnya
+              </button>
+            </div>
           </div>
         )}
       </div>
