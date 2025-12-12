@@ -9,39 +9,32 @@ export { UserRole, hashPassword, comparePassword, generateToken, verifyToken };
 
 // Authenticate user
 export const authenticateUser = async (email: string, password: string) => {
-  const { pool } = await import('./db');
+  const { sql } = await import('./db');
+  const db = sql();
 
-  const client = await pool.connect();
+  // Using template literals for the query
+  const result = await db`SELECT * FROM users WHERE email = ${email}`;
 
-  try {
-    const result = await client.query(
-      'SELECT * FROM users WHERE email = $1',
-      [email]
-    );
+  const user = result[0];
 
-    const user = result.rows[0];
-
-    if (!user || !await comparePassword(password, user.password)) {
-      throw new Error('Invalid email or password');
-    }
-
-    if (!user.isActive) {
-      throw new Error('Account is deactivated');
-    }
-
-    const token = await generateToken({ // Await this as it's now async
-      id: user.id,
-      email: user.email,
-      role: user.role as UserRole
-    });
-
-    // Remove password from returned user object
-    const { password: _, ...userWithoutPassword } = user;
-
-    return { user: userWithoutPassword, token };
-  } finally {
-    client.release(); // Just release the client back to the pool
+  if (!user || !await comparePassword(password, user.password)) {
+    throw new Error('Invalid email or password');
   }
+
+  if (!user.isActive) {
+    throw new Error('Account is deactivated');
+  }
+
+  const token = await generateToken({ // Await this as it's now async
+    id: user.id,
+    email: user.email,
+    role: user.role as UserRole
+  });
+
+  // Remove password from returned user object
+  const { password: _, ...userWithoutPassword } = user;
+
+  return { user: userWithoutPassword, token };
 };
 
 // Get user from token
@@ -53,29 +46,21 @@ export const getUserFromToken = async (token?: string) => {
   try {
     const decoded = await verifyToken(token); // Await this as it's now async
 
-    const { pool } = await import('./db');
+    const { sql } = await import('./db');
+    const db = sql();
 
-    const client = await pool.connect();
+    const result = await db`SELECT * FROM users WHERE id = ${decoded.id} AND isActive = true`;
 
-    try {
-      const result = await client.query(
-        'SELECT * FROM users WHERE id = $1 AND isActive = true',
-        [decoded.id]
-      );
+    const user = result[0];
 
-      const user = result.rows[0];
-
-      if (!user) {
-        throw new Error('User not found or inactive');
-      }
-
-      // Remove password from returned user object
-      const { password: _, ...userWithoutPassword } = user;
-
-      return userWithoutPassword;
-    } finally {
-      client.release(); // Just release the client back to the pool
+    if (!user) {
+      throw new Error('User not found or inactive');
     }
+
+    // Remove password from returned user object
+    const { password: _, ...userWithoutPassword } = user;
+
+    return userWithoutPassword;
   } catch (error) {
     throw new Error('Invalid or expired token');
   }
@@ -91,20 +76,12 @@ export const checkAuthorization = (
 
 // Check if user exists by email
 export const checkUserExists = async (email: string): Promise<boolean> => {
-  const { pool } = await import('./db');
+  const { sql } = await import('./db');
+  const db = sql();
 
-  const client = await pool.connect();
+  const result = await db`SELECT id FROM users WHERE email = ${email}`;
 
-  try {
-    const result = await client.query(
-      'SELECT id FROM users WHERE email = $1',
-      [email]
-    );
-
-    return result.rows.length > 0;
-  } finally {
-    client.release(); // Just release the client back to the pool
-  }
+  return result.length > 0;
 };
 
 // Create user
@@ -132,23 +109,17 @@ export const createUser = async (
     role
   });
 
-  const { pool } = await import('./db');
+  const { sql } = await import('./db');
+  const db = sql();
 
-  const client = await pool.connect();
+  const result = await db`
+    INSERT INTO users (id, userId, name, email, password, role, barcodeData, classId, subject)
+    VALUES (${uuidv4()}, ${userId}, ${name}, ${email}, ${hashedPassword}, ${role}, ${barcodeData}, ${classId || null}, ${subject || null})
+    RETURNING *
+  `;
 
-  try {
-    const result = await client.query(
-      `INSERT INTO users (id, userId, name, email, password, role, barcodeData, classId, subject)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-       RETURNING *`,
-      [uuidv4(), userId, name, email, hashedPassword, role, barcodeData, classId || null, subject || null]
-    );
+  // Remove password from returned user object
+  const { password: _, ...userWithoutPassword } = result[0];
 
-    // Remove password from returned user object
-    const { password: _, ...userWithoutPassword } = result.rows[0];
-
-    return userWithoutPassword;
-  } finally {
-    client.release(); // Just release the client back to the pool
-  }
+  return userWithoutPassword;
 };

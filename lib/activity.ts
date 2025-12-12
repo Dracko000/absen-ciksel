@@ -1,5 +1,5 @@
 // lib/activity.ts
-import { pool } from './db';
+import { sql } from './db';
 
 export const logActivity = async (
   userId: string,
@@ -8,15 +8,10 @@ export const logActivity = async (
   ipAddress: string,
   userAgent: string
 ) => {
-  const client = await pool.connect();
+  const db = sql();
 
-  try {
-    await client.query(
-      `INSERT INTO activity_logs (userId, action, description, ipAddress, userAgent)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [userId, action, description, ipAddress, userAgent]
-    );
-  } finally {
-    client.release();
-  }
+  await db`
+    INSERT INTO activity_logs (userId, action, description, ipAddress, userAgent)
+    VALUES (${userId}, ${action}, ${description}, ${ipAddress}, ${userAgent})
+  `;
 };

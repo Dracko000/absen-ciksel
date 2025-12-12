@@ -1,55 +1,37 @@
-// lib/db.ts - Optimized for serverless functions
-import { Pool } from 'pg';
+// lib/db.ts - Updated for Neon serverless driver
+import { neon } from '@neondatabase/serverless';
 
-// Create a single instance of the pool to be reused
-let pool: Pool;
+// Create a single instance of the database client to be reused
+let sql: ReturnType<typeof neon>;
 
-// Initialize the pool based on NODE_ENV
-if (process.env.NODE_ENV === 'production') {
-  // Production: use SSL for NeonDB compatibility
-  pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: {
-      rejectUnauthorized: false
-    },
-    // Connection pool settings optimized for serverless
-    min: 0,
-    max: 10,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000,
-  });
-} else {
-  // Development: no SSL required
-  pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: false,
-    min: 0,
-    max: 10,
-  });
-}
+// Function to get the SQL client
+export const getSqlClient = () => {
+  if (!sql) {
+    if (!process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL is not defined');
+    }
+    sql = neon(process.env.DATABASE_URL);
+  }
+  return sql;
+};
 
 // Create functions for database operations
 export const getClient = async () => {
-  return await pool.connect();
+  return getSqlClient();
 };
 
-// Export the pool directly for direct queries
-export { pool };
-
-// Get pool function for use in scripts
-export const getPool = () => {
-  return pool;
-};
+// Export the sql client directly for direct queries
+export { getSqlClient as sql };
 
 // Initialize database tables if they don't exist
 export const initializeDatabase = async () => {
-  const client = await pool.connect();
+  const sql = getSqlClient();
 
   try {
     console.log('Initializing database tables...');
 
     // Create users table
-    await client.query(`
+    await sql(`
       CREATE TABLE IF NOT EXISTS users (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         userId VARCHAR(50) UNIQUE NOT NULL,
@@ -67,7 +49,7 @@ export const initializeDatabase = async () => {
     `);
 
     // Create attendance table
-    await client.query(`
+    await sql(`
       CREATE TABLE IF NOT EXISTS attendance (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         userId UUID NOT NULL REFERENCES users(id),
@@ -82,7 +64,7 @@ export const initializeDatabase = async () => {
     `);
 
     // Create activity_logs table
-    await client.query(`
+    await sql(`
       CREATE TABLE IF NOT EXISTS activity_logs (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         userId UUID NOT NULL REFERENCES users(id),
@@ -98,7 +80,5 @@ export const initializeDatabase = async () => {
   } catch (error) {
     console.error('Error initializing database:', error);
     throw error;
-  } finally {
-    client.release();
   }
 };
